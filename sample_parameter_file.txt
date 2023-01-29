@@ -1,0 +1,34 @@
+# short-circuit temperature coefficient A/C
+alpha_sc:0.0048852
+# 
+a_ref:0.026342717388301195
+# light-generated photocurrent at reference (amperes)
+I_L_ref:10.648806831665222
+# dark or diode reverse saturation current at reference (amperes)
+I_o_ref:2.202789490430428e-11
+# shunt resistance at reference (ohms)
+R_sh_ref:1000
+# series resistance at reference (ohms)
+R_s:0.0043
+# adjustment to the temperature coefficient for short circuit current (%)
+Adjust:-95.97013101108585
+# energy bandage at reference (eV)
+EgRef:1.121
+# temperature dependence of the energy bandgap at reference (1/K)
+dEgdT:-0.0002677
+# reference irradiance (W/m2)
+irrad_ref:1000
+# reference temperature (C)
+temp_ref:25
+# fraction of pumice current involved in avalanche breakdown (0 will exclude breakdown from model)
+breakdown_factor: 2e-3
+# avalanche breakdown exponent
+breakdown_exp: 3
+# reverse breakdown voltage of PV junction (V)
+breakdown_voltage: -15
+# the voltage at which the blocking diode is engage (V) 
+diode_threshold: -0.5
+# threshold below which the array should not be considered as producing current (W/m2)
+minimum_irradiance_array: 10
+# threshold below which the cell should not be considered as producing current (W/m2)
+minimum_irradiance_cell: 2
