@@ -13,6 +13,7 @@ class Cell:
         self.iv_library = None
         self.iv_library_conditions = None
         self.iv_library_resolution = None
+        self.vectorized_retrieve_curve = np.vectorize(self.retrieve_curve, excluded='self')
 
     def assign_parameters(self):
         # TODO map datatypes to value assignment
@@ -22,8 +23,9 @@ class Cell:
     def assign_iv_library(self, profile_path, write_library=True):
         conditions = utils.create_conditions_map()
         if os.path.exists(profile_path):
-            self.iv_library = utils.read_compressed_json(profile_path)
+            self.iv_library = utils.read_json(profile_path)
             self.iv_library_conditions = conditions
+            self.split_library_keys()
         else:
             simulation_results = {}
             for n in range(0, len(conditions)):
@@ -39,15 +41,55 @@ class Cell:
                 results = np.array(results)
                 simulation_results[key]['i'] = list(results[0, :])
                 simulation_results[key]['v'] = list(results[1, :])
-                if write_library:
-                    utils.write_compressed_json(simulation_results, profile_path)
+            if write_library:
+                utils.write_json(simulation_results, profile_path)
 
-                self.iv_library = simulation_results
-                self.iv_library_conditions = conditions
+            self.iv_library = simulation_results
+            self.iv_library_conditions = conditions
+            self.split_library_keys()
 
-    def retrieve_curve(self, irrad, temp):
-        iv_key = utils.find_matching_key(self.iv_library.keys(), self.iv_library_conditions, irrad, temp)
+    def find_matching_key(self, search_irrad, search_temp):
+        # search the preestablished conditions libraries for the closest match
+        matching_irrad_idx = self.iv_library_irrad_conditions.searchsorted(search_irrad)
+        matching_temp_idx = self.iv_library_temp_conditions.searchsorted(search_temp)
+
+        # if the match is greater than the highest number in the list search sorted adds an extra number ot the index
+        # so it needs to be clipped to the length of the conditions library minus 1 because of zero indexing
+        matching_irrad_idx = np.clip(matching_irrad_idx, 0, len(self.iv_library_irrad_conditions)-1)
+        matching_temp_idx = np.clip(matching_temp_idx, 0, len(self.iv_library_temp_conditions)-1)
+
+        # extract frm the library based on the matching idx
+        matching_irrad = self.iv_library_irrad_conditions[matching_irrad_idx]
+        matching_temp = self.iv_library_temp_conditions[matching_temp_idx]
+
+        # return the formatted key
+        return f"{int(matching_irrad)},{matching_temp}"
+
+    def retrieve_curve(self, search_irrad, search_temp):
+        iv_key = self.find_matching_key(search_irrad, search_temp)
         return iv_key, self.iv_library[iv_key]['i'], self.iv_library[iv_key]['v']
+
+    def retrieve_curves_multiple_cells(self, irradiance_arr, temperature_arr):
+        i_list = []
+        v_list = []
+        for params in list(zip(irradiance_arr, temperature_arr)):
+            k, i, v = self.retrieve_curve(params[0], params[1])
+            i_list.append(i)
+            v_list.append(v)
+
+        iv_curves = np.array([i_list, v_list])
+        return iv_curves
+
+    def split_library_keys(self):
+        irrad_conditions = []
+        temp_conditions = []
+        for k in self.iv_library.keys():
+            k_split = k.split(",")
+            irrad_conditions.append(k_split[0])
+            temp_conditions.append(k_split[1])
+
+        self.iv_library_irrad_conditions = np.sort(np.array(list(set(irrad_conditions)), dtype=float))
+        self.iv_library_temp_conditions = np.sort(np.array(list(set(temp_conditions)), dtype=float))
 
 
     def cell_plot_iv(self, irrad_list, temp_list, title,

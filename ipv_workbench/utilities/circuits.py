@@ -1,15 +1,22 @@
 import numpy as np
 
-def calc_series(curves, substring_Isc, substring_Imax, diode_threshold=None, bypass=True):
-    I_data = curves[:, :, 0]
-    V_data = curves[:, :, 1]
+
+def calc_series(iv_curves, cell, diode_threshold=None, bypass=True):
+    # I_data = curves[:, :, 0]
+    # V_data = curves[:, :, 1]
+    I_data = iv_curves[0, :, :]
+    V_data = iv_curves[1, :, :]
+
+    substring_Isc = calc_short_circuit(iv_curves)
+    substring_Imax = calc_current_max(iv_curves, cell)
+
     Isub, Vsub = assemble_series(I_data,
                                  V_data,
                                  np.mean(substring_Isc),
                                  np.max(substring_Imax))
     if bypass == True:
         if diode_threshold is None:
-            diode_threshold = -0.5
+            diode_threshold = cell.diode_threshold
         Vsub = np.clip(Vsub, a_min=diode_threshold, a_max=None)
     else:
         pass
@@ -59,16 +66,17 @@ def assemble_series(I, V, meanIsc, Imax):
     for i, v in zip(I, V):
         # interp requires x, y to be sorted by x in increasing order
         Vtot += np.interp(Itot, np.flipud(i), np.flipud(v))
-    # return np.flipud(Itot), np.flipud(Vtot)
-    return Itot, Vtot
+    return np.flipud(Itot), np.flipud(Vtot)
 
 
-def calc_parallel(curves):
-    I_data = curves[:, :, 0]
-    V_data = curves[:, :, 1]
+def calc_parallel(iv_curves):
+    I_data = iv_curves[0, :, :]
+    V_data = iv_curves[1, :, :]
     Vmax = np.max(V_data)
     Vmin = np.min(V_data)
-    return assemble_parallel(I_data, V_data, Vmax, Vmin)
+    I, V = assemble_parallel(I_data, V_data, Vmax, Vmin)
+    return I, V
+
 
 def assemble_parallel(I, V, Vmax, Vmin, Voc=None):
     """
@@ -82,9 +90,6 @@ def assemble_parallel(I, V, Vmax, Vmin, Voc=None):
     :param Voc: (``None``) open circuit voltage [V]
     """
 
-    I = np.asarray(I)  # currents [A]
-    V = np.asarray(V)  # voltages [V]
-
     _npts = 101
     pts = (11. - np.logspace(np.log10(11.), 0., _npts)) / 10.
     negpts = (11. - np.logspace(np.log10(11. - 1. / float(_npts)),
@@ -97,7 +102,7 @@ def assemble_parallel(I, V, Vmax, Vmin, Voc=None):
     if Voc is None:
         Voc = Vmax
 
-
+    I, V = np.asarray(I), np.asarray(V)
     Vmax = np.asarray(Vmax)
     Vmin = np.asarray(Vmin)
     Voc = np.asarray(Voc)
@@ -118,3 +123,38 @@ def assemble_parallel(I, V, Vmax, Vmin, Voc=None):
         Itot += np.interp(Vtot, v, i)
     return Itot, Vtot
 
+
+# ================================ Utilities ================================
+
+def calc_short_circuit(iv_curves):
+    # substring_Isc = [np.interp(0,
+    #                         sub[:,1], # V curve valeus
+    #                         sub[:,0]) # I curve values
+    #                 for sub in iv_curves]
+    substring_Isc = [np.interp(0,
+                               iv_curves[1][c],
+                               iv_curves[0][c])
+                     for c in range(0, iv_curves.shape[1])]
+    return np.array(substring_Isc)
+
+
+def calc_current_max(iv_curves, cell):
+    # substring_Imax = [np.interp(cell.breakdown_voltage,
+    #                         sub[:,1], # V curve valeus
+    #                         sub[:,0]) # I curve values
+    #                 for sub in iv_curves]
+    substring_Imax = [np.interp(cell.breakdown_voltage,
+                                iv_curves[1][c],
+                                iv_curves[0][c])
+                      for c in range(0, iv_curves.shape[1])]
+    return np.array(substring_Imax)
+
+
+def find_mpp(iv_arr):
+    power_arr = iv_arr[0, :] * iv_arr[1, :]
+    idx = np.argmax(power_arr)
+    return power_arr, iv_arr[0, :][idx], iv_arr[1, :][idx]
+
+
+def apply_bypass_diode(Vsub, module_params):
+    return np.clip(Vsub, a_min=module_params['diode_threshold'], a_max=None)

@@ -3,14 +3,16 @@ import gzip
 import json
 import pickle
 import pandas as pd
-
+from operator import itemgetter
 
 def ts_8760(year=2022):
-    index = pd.date_range(start=f"01-01-{year} 00:00",end=f"12-31-{year} 23:00",freq="h")
+    index = pd.date_range(start=f"01-01-{year} 00:00", end=f"12-31-{year} 23:00", freq="h")
     return index
+
 
 def flatten_list(lst):
     return [j for i in lst for j in i]
+
 
 def read_parameter_file(parameter_file):
     """
@@ -100,7 +102,6 @@ def write_json(input_dict, out_path):
             json.dump(input_dict, fp)
 
 
-
 def find_unique_condition(conditions_list):
     unique_conditions = list(set(conditions_list))
     unique_conditions.sort()
@@ -122,6 +123,11 @@ def find_step(conditions, variable):
 def round_nearest(x, a):
     return round(x / a) * a
 
+def find_nearest(search_value,cell,search_var):
+    nearest_value = round_nearest(search_value,
+                                  find_step(cell.iv_library_conditions,
+                                            variable=search_var))
+    return nearest_value
 
 def find_matching_key(all_keys, conditions, search_irrad, search_temp):
     nearest_irrad = float(round_nearest(search_irrad, find_step(conditions, variable='irradiance')))
@@ -135,30 +141,110 @@ def find_matching_key(all_keys, conditions, search_irrad, search_temp):
     else:
         return matching_temp[0]
 
-def find_mpp(iv_arr):
-    power_arr = iv_arr[0, :] * iv_arr[1, :]
-    idx = np.argmax(power_arr)
-    return power_arr, iv_arr[0, :][idx], iv_arr[1, :][idx]
-
-
-def apply_bypass_diode(Vsub, module_params):
-    return np.clip(Vsub, a_min=module_params['diode_threshold'], a_max=None)
-
 
 def read_pickle(file_path, read_method='rb'):
     with open(file_path, read_method) as fp:
         loaded_file = pickle.load(fp)
     return loaded_file
 
-def calc_short_circuit(iv_curves):
-    substring_Isc = [np.interp(0,
-                            sub[:,1], # V curve valeus
-                            sub[:,0]) # I curve values
-                    for sub in iv_curves]
-    return np.array(substring_Isc)
-def calc_current_max(iv_curves, cell):
-    substring_Imax = [np.interp(cell.breakdown_voltage,
-                            sub[:,1], # V curve valeus
-                            sub[:,0]) # I curve values
-                    for sub in iv_curves]
-    return np.array(substring_Imax)
+
+def tmy_to_dataframe(path_data):
+    tmy_labels = [
+        'year', 'month', 'day', 'hour', 'minute', 'datasource', 'drybulb_C',
+        'dewpoint_C', 'relhum_percent', 'atmos_Pa', 'exthorrad_Whm2',
+        'extdirrad_Whm2', 'horirsky_Whm2', 'glohorrad_Whm2', 'dirnorrad_Whm2',
+        'difhorrad_Whm2', 'glohorillum_lux', 'dirnorillum_lux',
+        'difhorillum_lux', 'zenlum_lux', 'winddir_deg', 'windspd_ms',
+        'totskycvr_tenths', 'opaqskycvr_tenths', 'visibility_km',
+        'ceiling_hgt_m', 'presweathobs', 'presweathcodes', 'precip_wtr_mm',
+        'aerosol_opt_thousandths', 'snowdepth_cm', 'days_last_snow', 'Albedo',
+        'liq_precip_depth_mm', 'liq_precip_rate_Hour'
+    ]
+
+    df = pd.read_csv(path_data,
+                     skiprows=8,
+                     header=None,
+                     index_col=False,
+                     usecols=list(range(0, 35)),
+                     names=tmy_labels)  # .drop('datasource', axis=1)
+
+    df['hour'] = df['hour'].astype(int)
+    if df['hour'][0] == 1:
+        # print('TMY file hours reduced from 1-24h to 0-23h')
+        df['hour'] = df['hour'] - 1
+    else:
+        pass
+        # print('TMY file hours maintained at 0-23hr')
+    df['minute'] = 0
+    return df
+
+
+def archive_expand_ndarray_2d_3d_slow(ndarray_input):
+    empty_arr = np.zeros((ndarray_input.shape[0],
+                          ndarray_input.shape[1],
+                          ndarray_input[0][0].shape[0]))
+
+    for n, i in enumerate(np.ndindex(empty_arr.shape)):
+        empty_arr[i[0], i[1], i[2]] = np.array(ndarray_input[i[0], i[1]][i[2]])
+    return empty_arr
+
+
+def expand_ndarray_2d_3d(ndarray_input):
+    return np.array([[np.array(arr_) for arr_ in arr] for arr in ndarray_input])
+
+
+def archive_extract_curves_multiple_cells(irradiance_arr, temperature_arr, cell):
+    i_list = []
+    v_list = []
+    for params in list(zip(irradiance_arr, temperature_arr)):
+
+        # k, i, v = cell.retrieve_curve(params[0], params[1])
+        k, i, v = cell.retrieve_curve(int(find_nearest(params[0],cell,"irradiance")),
+                                      float(find_nearest(params[1], cell, "temperature"))
+                                      )
+        i_list.append(i)
+        v_list.append(v)
+
+    iv_curves = np.array([i_list, v_list])
+    return iv_curves
+
+
+def generate_empty_results_dict(target):
+    empty_dict = {'imp': {},
+                  'vmp': {},
+                  'pmp': {},
+                  'isc': {},
+                  'voc': {},
+                  'ff': {},
+                  'irrad': {},
+                  'eff': {}}
+
+    if target=='SRTING':
+
+        empty_dict.pop('isc', None)
+        empty_dict.pop('voc', None)
+
+    elif target=='SURFACE':
+
+        empty_dict.pop('isc', None)
+        empty_dict.pop('voc', None)
+
+    elif target=='OBJECT':
+
+        empty_dict.pop('imp', None)
+        empty_dict.pop('vmp', None)
+        empty_dict.pop('isc', None)
+        empty_dict.pop('voc', None)
+        empty_dict.pop('ff', None)
+
+    return empty_dict
+
+
+def gather_sublevel_results(panelizer_object, larger_dict, sublevel_iterable, result_key):
+
+    dict_list = []
+    for sub in sublevel_iterable:
+        sub_dict = larger_dict[sub]['YIELD'][panelizer_object.topology]
+        dict_list.append(sub_dict[result_key])
+
+    return {k:sum(map(itemgetter(k), dict_list)) for k in dict_list[0]}

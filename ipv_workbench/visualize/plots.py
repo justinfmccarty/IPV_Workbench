@@ -1,9 +1,10 @@
 import pandas as pd
 import proplot as pplt
 import numpy as np
-from ipv_workbench.utilities import utils
+from ipv_workbench.utilities import utils, circuits
 
-def plot_curves(i_arrs, v_arrs, module_params, labels, colors, title, linewidth=1, linestyle='solid', fs=(5, 3),
+
+def plot_curves(i_arrs, v_arrs, module_params, labels='label', colors='k', title='title', linewidth=1, linestyle='solid', fs=(5, 3),
                 bypass=False, y_max=None, save=None, reverse=True, mpp=False):
     # check for iterables
     if not isinstance(i_arrs, list):
@@ -49,6 +50,7 @@ def plot_curves(i_arrs, v_arrs, module_params, labels, colors, title, linewidth=
             df = pd.DataFrame({"i": I, "v": V})
         else:
             df = pd.DataFrame({"i": arr[0, :], "v": arr[1, :]})
+
         i_min.append(df['i'].min())
         i_max.append(df['i'].max())
         v_min.append(df['v'].min())
@@ -56,7 +58,7 @@ def plot_curves(i_arrs, v_arrs, module_params, labels, colors, title, linewidth=
         iv_left = df.plot('v', 'i', ax=axes[0], linewidth=lw, c=cl, linestyle=ls)
         iv_right = df.plot('v', 'i', ax=axes[1], label=label, linewidth=lw, c=cl, linestyle=ls)
         if mpp == True:
-            mpp_ = utils.find_mpp(arr)
+            mpp_ = circuits.find_mpp(arr)
             if n + 1 == len(i_arrs):
                 # solves the duplicated MPP in legend
                 mpp_line_A = axes[1].hlines(y=mpp_[1],
@@ -112,13 +114,15 @@ def plot_curves(i_arrs, v_arrs, module_params, labels, colors, title, linewidth=
                            linewidth=bypass_lw,
                            linestyle=bypass_ls,
                            color=bypass_color)
-
-    axes[1].legend(loc="upper left", facecolor="lightgrey",
-                   bbox_to_anchor=(1.02, 1),
-                   ncol=1,
-                   fancybox=False, shadow=False,
-                   borderaxespad=0,
-                   prop={'size': 6})
+    if labels[0] is None:
+        pass
+    else:
+        axes[1].legend(loc="upper left", facecolor="lightgrey",
+                       bbox_to_anchor=(1.02, 1),
+                       ncol=1,
+                       fancybox=False, shadow=False,
+                       borderaxespad=0,
+                       prop={'size': 6})
 
     if reverse == False:
         fig.delaxes(axes[0])
