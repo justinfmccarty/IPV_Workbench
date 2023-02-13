@@ -5,7 +5,7 @@ from ipv_workbench.utilities import utils, circuits
 
 
 def plot_curves(i_arrs, v_arrs, module_params, labels='label', colors='k', title='title', linewidth=1, linestyle='solid', fs=(5, 3),
-                bypass=False, y_max=None, save=None, reverse=True, mpp=False):
+                bypass=False, y_max=None, x_min=None, save=None, reverse=True, mpp=False):
     # check for iterables
     if not isinstance(i_arrs, list):
         i_arrs = [i_arrs]
@@ -45,7 +45,7 @@ def plot_curves(i_arrs, v_arrs, module_params, labels='label', colors='k', title
     for i_arr, v_arr, label, lw, cl, ls in zip(i_arrs, v_arrs, labels, linewidth, colors, linestyle):
         arr = np.array([i_arr, v_arr])
         if bypass == True:
-            V = utils.apply_bypass_diode(arr[1, :], module_params)
+            V = circuits.apply_bypass_diode(arr[1, :], module_params)
             I = arr[0, :]
             df = pd.DataFrame({"i": I, "v": V})
         else:
@@ -89,6 +89,11 @@ def plot_curves(i_arrs, v_arrs, module_params, labels='label', colors='k', title
         axes[0].set_ylim([0, np.max(i_max)])
     else:
         axes[0].set_ylim([0, y_max])
+
+    if x_min == None:
+        x_min = np.min(v_min) * 1.25
+
+    axes[0].set_xlim([x_min, 0])
     axes[1].set_xlim([0, np.max(v_max) * 1.25])
 
     axes[0].legend().set_visible(False)

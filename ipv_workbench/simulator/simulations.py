@@ -4,7 +4,7 @@ import numpy as np
 from ipv_workbench.utilities import circuits, utils
 
 
-def simulate_cell_curve(parameters, Geff, Tcell, ivcurve_pnts=1000):
+def solve_iv_curve(parameters, Geff, Tcell, ivcurve_pnts=1000):
     """
     Use De Soto and Bishop to simulate a full IV curve with both
     forward and reverse bias regions.
@@ -15,7 +15,18 @@ def simulate_cell_curve(parameters, Geff, Tcell, ivcurve_pnts=1000):
     :return: tuple output of bishop88 IV curve calculation (currents [A], voltages [V])
     """
     # adjust the reference parameters according to the operating conditions of Geff and Tcell using the De Soto model:
-    sde_args = pvsystem.calcparams_cec(
+    # sde_args = pvsystem.calcparams_cec(
+    #     Geff,
+    #     Tcell,
+    #     alpha_sc=parameters['alpha_sc'],
+    #     a_ref=parameters['a_ref'],
+    #     I_L_ref=parameters['I_L_ref'],
+    #     I_o_ref=parameters['I_o_ref'],
+    #     R_sh_ref=parameters['R_sh_ref'],
+    #     R_s=parameters['R_s'],
+    #     Adjust=parameters['Adjust']
+    # )
+    sde_args = pvsystem.calcparams_desoto(
         Geff,
         Tcell,
         alpha_sc=parameters['alpha_sc'],
@@ -24,7 +35,6 @@ def simulate_cell_curve(parameters, Geff, Tcell, ivcurve_pnts=1000):
         I_o_ref=parameters['I_o_ref'],
         R_sh_ref=parameters['R_sh_ref'],
         R_s=parameters['R_s'],
-        Adjust=parameters['Adjust']
     )
     # sde_args has values:
     # (photocurrent, saturation_current, resistance_series,
@@ -42,10 +52,130 @@ def simulate_cell_curve(parameters, Geff, Tcell, ivcurve_pnts=1000):
     )
     # ideally would use some intelligent log-spacing to concentrate points
     # around the forward- and reverse-bias knees, but this is good enough:
-    vd = np.linspace(0.99 * kwargs['breakdown_voltage'], v_oc, ivcurve_pnts)
+    evaluated_voltages = utils.create_voltage_range(sde_args, kwargs)
 
-    I, V, P = singlediode.bishop88(vd, *sde_args, **kwargs)
-    return I, V
+    # Basic assumption here: Module IV-curve can be converted to a cell IV-curve by
+    # dividing the module voltage by the number of cells
+    # the subcell current is calculated by dividing currents by the number of subcells.
+
+    I, V, P = singlediode.bishop88(evaluated_voltages, *sde_args, **kwargs)
+
+    return np.array(I), np.array(V)
+
+
+def solve_cells(parameters, Geff, Tcell):
+    """
+    Use De Soto and Bishop to simulate a full IV curve with both
+    forward and reverse bias regions.
+    :param parameters: the cell parameters
+    :param Geff: the irradiance at the cell
+    :param Tcell: the cell temperature
+    :param ivcurve_pnts: the number of points to build the IV curve from Default 1000
+    :return: tuple output of bishop88 IV curve calculation (currents [A], voltages [V])
+    """
+    # adjust the reference parameters according to the operating conditions of Geff and Tcell using the De Soto model:
+    sde_args = pvsystem.calcparams_desoto(
+        Geff,
+        Tcell,
+        alpha_sc=parameters['alpha_sc'],
+        a_ref=parameters['a_ref'],
+        I_L_ref=parameters['I_L_ref'],
+        I_o_ref=parameters['I_o_ref'],
+        R_sh_ref=parameters['R_sh_ref'],
+        R_s=parameters['R_s']
+    )
+    # sde_args has values:
+    # (photocurrent, saturation_current, resistance_series,
+    # resistance_shunt, nNsVth)
+
+    # Use Bishop's method to calculate points on the IV curve with V ranging
+    # from the reverse breakdown voltage to open circuit
+    kwargs = {
+        'breakdown_factor': parameters['breakdown_factor'],
+        'breakdown_exp': parameters['breakdown_exp'],
+        'breakdown_voltage': parameters['breakdown_voltage'],
+    }
+    evaluated_voltages = utils.create_voltage_range(sde_args, kwargs)
+
+    # Basic assumption here: Module IV-curve can be converted to a cell IV-curve by
+    # dividing the module voltage by the number of cells
+    # the subcell current is calculated by dividing currents by the number of subcells.
+    I, V, P = singlediode.bishop88(evaluated_voltages, *sde_args, **kwargs)
+
+    return I / parameters['N_p'], V / parameters['N_s']
+
+
+def solve_subcells(evaluated_voltages, parameters, Geff, Tcell, ivcurve_pnts=1000):
+    """
+    Use De Soto and Bishop to simulate a full IV curve with both
+    forward and reverse bias regions.
+    :param parameters: the cell parameters
+    :param Geff: the irradiance at the cell
+    :param Tcell: the cell temperature
+    :param ivcurve_pnts: the number of points to build the IV curve from Default 1000
+    :return: tuple output of bishop88 IV curve calculation (currents [A], voltages [V])
+    """
+    # adjust the reference parameters according to the operating conditions of Geff and Tcell using the De Soto model:
+    # sde_args has values:
+    # (photocurrent, saturation_current, resistance_series, resistance_shunt, nNsVth)
+    num_subcells = parameters['N_subcells']
+    sde_args = np.vectorize(pvsystem.calcparams_desoto)(Geff,
+                                                        Tcell,
+                                                        alpha_sc=parameters['alpha_sc'],
+                                                        a_ref=parameters['a_ref'],
+                                                        I_L_ref=parameters['I_L_ref'],
+                                                        I_o_ref=parameters['I_o_ref'],
+                                                        R_sh_ref=parameters['R_sh_ref'],
+                                                        R_s=parameters['R_s'])
+    sde_args = np.array(sde_args)
+    # Use Bishop's method to calculate points on the IV curve with V ranging
+    # from the reverse breakdown voltage to open circuit
+    kwargs = {
+        'breakdown_factor': parameters['breakdown_factor'],
+        'breakdown_exp': parameters['breakdown_exp'],
+        'breakdown_voltage': parameters['breakdown_voltage'],
+    }
+
+    i_subcell = []
+    v_subcell = []
+
+    for n in range(0, num_subcells):
+        i_, v_, p_ = singlediode.bishop88(evaluated_voltages,
+                                          *sde_args[:, n],
+                                          **kwargs
+                                          )
+        i_ = i_ / num_subcells
+        v_ = v_ / parameters['N_s']
+        i_subcell.append(i_)
+        v_subcell.append(v_)
+
+    # build a consistent V array for the different I curves
+    Vmax_list = []
+    Vmin_list = []
+
+    for n in range(0, len(i_subcell)):
+        i_c = np.array(i_subcell[n])
+        v_c = np.array(v_subcell[n])
+        i_max = np.max(i_c)
+        # interpolate IV characteristic to find where V is 0
+        # have ot flip (sort) I
+        Vmax_list.append(np.interp(0, np.flipud(i_c), np.flipud(v_c)))  # where Current is 0, Voltage is...
+        Vmin_list.append(np.interp(i_max, np.flipud(i_c), np.flipud(v_c)))  # where Current is Max, Voltage is...
+
+    Vmax = max(Vmax_list)
+    Vmin = min(Vmin_list)
+    V_range = np.linspace(Vmin, Vmax, ivcurve_pnts)
+
+    new_i_list = []
+    for n in range(0, len(i_subcell)):
+        i_c = np.array(i_subcell[n])
+        v_c = np.array(v_subcell[n])
+        new_i_list.append(np.interp(V_range, v_c, i_c))
+
+    i_cell = np.sum(new_i_list, axis=0)
+    v_cell = V_range
+
+    return i_cell, v_cell
 
 
 #
@@ -103,7 +233,7 @@ def calcMPP_IscVocFF(Isys, Vsys):
                 Isc = np.interp(np.float64(0), Vsys, Isys)  # calculate Isc
                 FF = Pmp / Isc / Voc
 
-    return dict(zip(['imp', 'vmp', 'pmp', 'isc', 'voc', 'ff'],[Imp, Vmp, Pmp, Isc, Voc, FF]))
+    return dict(zip(['imp', 'vmp', 'pmp', 'isc', 'voc', 'ff'], [Imp, Vmp, Pmp, Isc, Voc, FF]))
 
 
 def simulation_central_inverter(panelizer_object, surface, hoy):
@@ -129,16 +259,22 @@ def simulation_string_inverter(panelizer_object, surface, hoy):
     for string in panelizer_object.get_strings(surface):
         modules_i, modules_v, modules_g = loop_module_simulation(panelizer_object, surface, string, hoy)
         module_curves = np.array([modules_i, modules_v])
-        Istr, Vstr = circuits.calc_series(module_curves, panelizer_object.cell)
-        input_energy = np.sum(modules_g)
+        Istr, Vstr = circuits.calc_series(module_curves,
+                                          breakdown_voltage=panelizer_object.cell.cell_params['breakdown_voltage'],
+                                          diode_threshold=panelizer_object.cell.cell_params['diode_threshold'],
+                                          bypass=True)
+        Gstr = np.sum(modules_g)
+
         strings_i.append(Istr)
         strings_v.append(Vstr)
-        strings_g.append(input_energy)
+        strings_g.append(Gstr)
 
+        panelizer_object.get_dict_instance([surface, string])['CURVES'][panelizer_object.topology]['Istr'].update(
+            {hoy: np.round(Istr, 5)})
+        panelizer_object.get_dict_instance([surface, string])['CURVES'][panelizer_object.topology]['Vstr'].update(
+            {hoy: np.round(Vstr, 5)})
         panelizer_object.get_dict_instance([surface, string])['YIELD'][panelizer_object.topology][
-            'irrad'].update({hoy: np.round(input_energy, 1)})
-        panelizer_object.get_dict_instance([surface, string])['CURVES'][panelizer_object.topology]['Istr'].update({hoy: np.round(Istr, 3)})
-        panelizer_object.get_dict_instance([surface, string])['CURVES'][panelizer_object.topology]['Vstr'].update({hoy: np.round(Vstr, 3)})
+            'irrad'].update({hoy: np.round(Gstr, 1)})
 
     return strings_i, strings_v, strings_g
 
@@ -156,7 +292,7 @@ def simulation_micro_inverter(panelizer_object, surface, hoy):
 
 
 def loop_module_simulation(panelizer_object, surface, string, hoy):
-    modules_i = [] #i array of all modules in the string
+    modules_i = []  # i array of all modules in the string
     modules_v = []
     modules_g = []
     for module in panelizer_object.get_modules(surface, string):

@@ -5,6 +5,9 @@ import pickle
 import pandas as pd
 from operator import itemgetter
 
+import pvlib
+
+
 def ts_8760(year=2022):
     index = pd.date_range(start=f"01-01-{year} 00:00", end=f"12-31-{year} 23:00", freq="h")
     return index
@@ -12,6 +15,22 @@ def ts_8760(year=2022):
 
 def flatten_list(lst):
     return [j for i in lst for j in i]
+
+
+def flip_maps(arr):
+    """
+    The panelizer from grasshopper writes the cells in a different order
+    than the maps are created. This corrects them so if they are flattened
+     they ar indexed the same. It only does this if the input for the object
+      was a file path and the map is a list (not a numpy array). This is
+      controlled in the panelizer object function itselfZ.
+    :param arr: the map (diode or submodule)
+    :return:
+    """
+    if type(arr) is list:
+        return np.fliplr(np.array(arr).T)
+    else:
+        return arr
 
 
 def read_parameter_file(parameter_file):
@@ -123,11 +142,13 @@ def find_step(conditions, variable):
 def round_nearest(x, a):
     return round(x / a) * a
 
-def find_nearest(search_value,cell,search_var):
+
+def find_nearest(search_value, cell, search_var):
     nearest_value = round_nearest(search_value,
                                   find_step(cell.iv_library_conditions,
                                             variable=search_var))
     return nearest_value
+
 
 def find_matching_key(all_keys, conditions, search_irrad, search_temp):
     nearest_irrad = float(round_nearest(search_irrad, find_step(conditions, variable='irradiance')))
@@ -197,9 +218,8 @@ def archive_extract_curves_multiple_cells(irradiance_arr, temperature_arr, cell)
     i_list = []
     v_list = []
     for params in list(zip(irradiance_arr, temperature_arr)):
-
         # k, i, v = cell.retrieve_curve(params[0], params[1])
-        k, i, v = cell.retrieve_curve(int(find_nearest(params[0],cell,"irradiance")),
+        k, i, v = cell.retrieve_curve(int(find_nearest(params[0], cell, "irradiance")),
                                       float(find_nearest(params[1], cell, "temperature"))
                                       )
         i_list.append(i)
@@ -219,17 +239,17 @@ def generate_empty_results_dict(target):
                   'irrad': {},
                   'eff': {}}
 
-    if target=='SRTING':
+    if target == 'SRTING':
 
         empty_dict.pop('isc', None)
         empty_dict.pop('voc', None)
 
-    elif target=='SURFACE':
+    elif target == 'SURFACE':
 
         empty_dict.pop('isc', None)
         empty_dict.pop('voc', None)
 
-    elif target=='OBJECT':
+    elif target == 'OBJECT':
 
         empty_dict.pop('imp', None)
         empty_dict.pop('vmp', None)
@@ -241,10 +261,87 @@ def generate_empty_results_dict(target):
 
 
 def gather_sublevel_results(panelizer_object, larger_dict, sublevel_iterable, result_key):
-
     dict_list = []
     for sub in sublevel_iterable:
         sub_dict = larger_dict[sub]['YIELD'][panelizer_object.topology]
         dict_list.append(sub_dict[result_key])
 
-    return {k:sum(map(itemgetter(k), dict_list)) for k in dict_list[0]}
+    return {k: sum(map(itemgetter(k), dict_list)) for k in dict_list[0]}
+
+
+def mask_nd(x, m):
+    '''
+    Mask a 2D array and preserve the
+    dimension on the resulting array
+    ----------
+    x: np.array
+       2D array on which to apply a mask
+    m: np.array
+        2D boolean mask
+    Returns
+    -------
+    List of arrays. Each array contains the
+    elements from the rows in x once masked.
+    If no elements in a row are selected the
+    corresponding array will be empty
+    https://stackoverflow.com/questions/53918392/mask-2d-array-preserving-shape
+    '''
+    take = m.sum(axis=1)
+    return np.array([arr for arr in np.split(x[m], np.cumsum(take)[:-1]) if len(arr) > 0])
+
+
+def create_voltage_range(sde_args, kwargs, curve_pts=1000):
+    v_oc = pvlib.singlediode.bishop88_v_from_i(0.0, *sde_args, **kwargs)
+    evaluated_voltages = np.linspace(0.95 * kwargs['breakdown_voltage'], v_oc * 1.05, curve_pts)
+    return evaluated_voltages
+
+
+def read_map_excel(file_path):
+    submodule_map = pd.read_excel(file_path, header=None, sheet_name='submodule').to_numpy().tolist()
+    subdiode_map = pd.read_excel(file_path, header=None, sheet_name='subdiode').to_numpy().tolist()
+    subcell_map = pd.read_excel(file_path, header=None, sheet_name='subcell').to_numpy().tolist()
+    return submodule_map, subdiode_map, subcell_map
+
+
+def tmy_location(tmy_file):
+    with open(tmy_file, "r") as fp:
+        tmy_header = fp.readlines()
+
+    tmy_first_line = tmy_header[0].split(",")
+    lat = round(float(tmy_first_line[6]), 3)
+    lon = round(float(tmy_first_line[7]), 3)
+    utc = int(float(tmy_first_line[8]))
+    elevation = int(tmy_first_line[9][0:3])
+    return {"lat": lat,
+            "lon": lon,
+            "utc": utc,
+            "elevation": elevation}
+
+
+def create_sun_mask(file_path_sun_up_hours):
+    sun = pd.read_csv(file_path_sun_up_hours, names=['HOY'])
+    if len(sun[sun['HOY'] == range(1416, 1440)]) > 0:
+        print('Leap days detected')
+
+    sun_hours = np.floor(sun).astype(int)
+    empty = pd.DataFrame(data={'HOY': list(range(0, 8760))})
+
+    def eval_sun_up(HOY, sun_up_list):
+        if HOY in sun_up_list:
+            return True
+        else:
+            return False
+
+    sun_up = empty.apply(lambda x: eval_sun_up(x['HOY'], sun_hours['HOY'].tolist()), axis=1)
+    sun_up = pd.DataFrame(sun_up).reset_index().rename(columns={"index": "HOY", 0: "Sunny"})
+    return sun_up, sun_hours
+
+def build_full_ill(file_path_sun_up_hours, ill_df):
+    if type(ill_df) is str:
+        ill_df = pd.read_csv(ill_df, delimiter=' ', header=None).iloc[:, 1:].T.reset_index(drop=True)
+    sun_up, sun_hours = create_sun_mask(file_path_sun_up_hours)
+    sun_ill = pd.concat([sun_hours, ill_df], axis=1)
+    irrad_df = pd.merge(sun_up, sun_ill, how="left", on="HOY").fillna(0)
+    del irrad_df['Sunny']
+    del irrad_df['HOY']
+    return irrad_df

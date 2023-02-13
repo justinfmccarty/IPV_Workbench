@@ -1,17 +1,21 @@
 from ipv_workbench.utilities import utils, circuits, time_utils
 from ipv_workbench.simulator import simulations
+from ipv_workbench.simulator import simulations_mp
 import os
 import numpy as np
 import pandas as pd
 import multiprocessing as mp
 
+
 class PanelizedObject:
     def __init__(self, panelizer_input):
         if type(panelizer_input) is dict:
+            self.input_type = 'dict'
             self.panelizer_file = None
             self.panelizer_dict = panelizer_input
         elif type(panelizer_input) is str:
             if os.path.exists(panelizer_input):
+                self.input_type = 'file'
                 self.panelizer_file = panelizer_input
                 self.panelizer_dict = utils.read_pickle(panelizer_input)
             else:
@@ -23,19 +27,35 @@ class PanelizedObject:
         self.module = None
         self.topology = None
         self.tmy_dataframe = None
-        self.analyis_period = (None,None,None) #start, end, increment
+        self.analyis_period = (None, None, None)  # start, end, increment
         self.all_hoy = None
-        self.ncpu = mp.cpu_count()-2
+        self.ncpu = mp.cpu_count() - 2
+        self.multiprocess = True
+        self.simulation_suite = False
+        self.simulation_suite_topologies = ['micro_inverter', 'string_inverter', 'central_inverter']
+        self.correct_maps()
+
+    def correct_maps(self):
+        if self.input_type == 'file':
+            for surface in self.get_surfaces():
+                strings = self.get_strings(surface)
+                for string in strings:
+                    modules = self.get_modules(surface, string)
+                    for module in modules:
+                        mod_dict = self.get_dict_instance([surface,string,module])
+                        mod_dict['MAPS']['DIODES'] = utils.flip_maps(mod_dict['MAPS']['DIODES'])
+                        mod_dict['MAPS']['SUBMODULES'] = utils.flip_maps(mod_dict['MAPS']['SUBMODULES'])
+                        mod_dict['MAPS']['SUBCELLS'] = utils.flip_maps(mod_dict['MAPS']['SUBCELLS'])
 
     def set_analysis_period(self, start, end, increment):
         self.analyis_period = (start, end, increment)
         self.all_hoy = np.arange(self.analyis_period[0], self.analyis_period[1], self.analyis_period[2])
 
-    def reset_results_dict(self, surface):
-        self.get_dict_instance([surface])['RESULTSDICT'] = {}
-
-    def get_results_dict(self, surface):
-        return self.get_dict_instance([surface])['RESULTSDICT']
+    # def reset_results_dict(self, surface):
+    #     self.get_dict_instance([surface])['RESULTSDICT'] = {}
+    #
+    # def get_results_dict(self, surface):
+    #     return self.get_dict_instance([surface])['RESULTSDICT']
 
     def get_surfaces(self):
         self.active_surfaces = list(self.panelizer_dict[self.object_type]['SURFACES'].keys())
@@ -102,7 +122,9 @@ class PanelizedObject:
         return self.cells_temp
 
     def calc_irrad_eff(self):
-        return self.cells_irrad
+        # effective_irradiance.calculate_effective_irradiance()
+        self.cells_irrad_eff = None
+        return self.cells_irrad_eff
 
     def get_dict_instance(self, keys):
         if len(keys) == 0:
@@ -119,6 +141,8 @@ class PanelizedObject:
 
     def calculate_module_curve(self, irradiance_hoy, temperature_hoy):
         # TODO break apart into constituent pieces
+        # TODO add subcell routine
+
         submodule_i = []
         submodule_v = []
 
@@ -135,21 +159,37 @@ class PanelizedObject:
                 submodule_subdiode_temp = submodule_temp[diode_mask]
                 sub_diode_curves = self.cell.retrieve_curves_multiple_cells(submodule_subdiode_irrad,
                                                                             submodule_subdiode_temp)
-                i, v = circuits.calc_series(sub_diode_curves, self.cell)
+                i, v = circuits.calc_series(sub_diode_curves,
+                                            breakdown_voltage=self.cell.cell_params['breakdown_voltage'],
+                                            diode_threshold=self.cell.cell_params['diode_threshold'],
+                                            bypass=False)
                 diode_i.append(i)
                 diode_v.append(v)
 
             # calc series with bypass diodes
             diode_curves = np.array([diode_i, diode_v])
-            i, v = circuits.calc_series(diode_curves, self.cell, bypass=True)
+            i, v = circuits.calc_series(diode_curves,
+                                        breakdown_voltage=self.cell.cell_params['breakdown_voltage'],
+                                        diode_threshold=self.cell.cell_params['diode_threshold'],
+                                        bypass=True)
             submodule_i.append(i)
             submodule_v.append(v)
         submodule_curves = np.array([submodule_i, submodule_v])
         Imod, Vmod = circuits.calc_parallel(submodule_curves)
         return Imod, Vmod
 
-    def simulate_system(self, surface, hoy):
+    def simulate_system_mp(self, surface):
+        if self.topology == 'central_inverter':
+            simulations_mp.simulation_central_inverter(
+                self, surface)
+        elif self.topology == 'string_inverter':
+            simulations_mp.simulation_string_inverter(
+                self, surface)
+        elif self.topology == 'micro_inverter':
+            simulations_mp.simulation_micro_inverter(
+                self, surface)
 
+    def simulate_system(self, surface, hoy):
         if self.topology == 'central_inverter':
             simulations.simulation_central_inverter(
                 self, surface, hoy)
@@ -180,7 +220,7 @@ class PanelizedObject:
                     [surface, string, module])['CURVES'][self.topology]['Vmod'][hoy]
 
                 simulation_results_string = simulations.calcMPP_IscVocFF(Imod_hoy,
-                                                                     Vmod_hoy)
+                                                                         Vmod_hoy)
                 temp_results_dict = utils.generate_empty_results_dict(
                     target='STRING')
                 temp_results_dict.update(simulation_results_string)
@@ -238,7 +278,7 @@ class PanelizedObject:
             # calculate mpp and related ->  [Imp, Vmp, Pmp, Isc, Voc, FF]
             # store in a temp directory
             simulation_results_string = simulations.calcMPP_IscVocFF(np.array(i_list[n]),
-                                                                 np.array(v_list[n]))
+                                                                     np.array(v_list[n]))
             temp_results_dict = utils.generate_empty_results_dict(
                 target='STRING')
             temp_results_dict.update(simulation_results_string)
@@ -315,7 +355,7 @@ class PanelizedObject:
             # calculate mpp and related ->  [Imp, Vmp, Pmp, Isc, Voc, FF]
             # store in a temp directory
             simulation_results = simulations.calcMPP_IscVocFF(np.array(i_list[n]),
-                                                          np.array(v_list[n]))
+                                                              np.array(v_list[n]))
             ## TODO when concatenating the writer this is a filter option based on topology
             temp_results_dict = utils.generate_empty_results_dict(
                 target='SURFACE')
@@ -336,7 +376,7 @@ class PanelizedObject:
                     'YIELD'][self.topology][key].update({hoy: np.round(temp_results_dict[key], 3)})
 
             # get the current at maximum power point to send to the module to calculate the power at MPP on the module
-            operating_vmp = np.round(temp_results_dict['vmp'], 3)
+            operating_vmp = np.round(temp_results_dict['vmp'], 5)
 
             # loop through all of the strings in the surface to recalaute power output and effiency
             # using the operating Vmp fomr the central inverter
@@ -378,11 +418,11 @@ class PanelizedObject:
 
                     # interp the relationship between I and V for the hour on the module using the operating V from
                     # the central inverter
-                    operating_imp = np.round(np.interp(operating_vmp, np.flipud(Vmod_hoy),
-                                                       np.flipud(Imod_hoy)), 5)
+                    module_vmp = np.round(np.interp(operating_imp, np.flipud(Vmod_hoy),
+                                                    np.flipud(Imod_hoy)), 5)
                     module_input_energy = self.get_dict_instance([surface, string, module])[
                         'YIELD'][self.topology]['irrad'][hoy]
-                    module_mpp_power = np.round(operating_vmp * operating_imp, 3)
+                    module_mpp_power = np.round(module_vmp * operating_imp, 3)
                     if module_input_energy == 0:
                         module_eff = 0
                     else:
@@ -393,7 +433,7 @@ class PanelizedObject:
                     self.get_dict_instance([surface, string, module])[
                         'YIELD'][self.topology]['imp'].update({hoy: operating_imp})
                     self.get_dict_instance([surface, string, module])[
-                        'YIELD'][self.topology]['vmp'].update({hoy: operating_vmp})
+                        'YIELD'][self.topology]['vmp'].update({hoy: module_vmp})
                     self.get_dict_instance([surface, string, module])[
                         'YIELD'][self.topology]['pmp'].update({hoy: module_mpp_power})
                     self.get_dict_instance([surface, string, module])[
@@ -412,7 +452,7 @@ class PanelizedObject:
             string_dict[key].update(key_result)
 
         # recalculate efficiency
-        for hoy_n, hoy in enumerate(range(0, 24)):
+        for hoy_n, hoy in enumerate(self.all_hoy):
             string_power = string_dict['pmp'][hoy]
             string_irrad = string_dict['irrad'][hoy]
             if string_irrad == 0:
@@ -439,7 +479,7 @@ class PanelizedObject:
                 surface_dict[key].update(key_result)
 
             # recalculate efficiency
-            for hoy_n, hoy in enumerate(range(0, 24)):
+            for hoy_n, hoy in enumerate(self.all_hoy):
                 surface_power = surface_dict['pmp'][hoy]
                 surface_irrad = surface_dict['irrad'][hoy]
                 if surface_irrad == 0:
@@ -459,7 +499,7 @@ class PanelizedObject:
             object_dict[key].update(key_result)
 
         # recalculate efficieny
-        for hoy_n, hoy in enumerate(range(0, 24)):
+        for hoy_n, hoy in enumerate(self.all_hoy):
             object_power = object_dict['pmp'][hoy]
             object_irrad = object_dict['irrad'][hoy]
             if object_irrad == 0:
@@ -468,13 +508,13 @@ class PanelizedObject:
                 object_efficiency = np.round(object_power / object_irrad, 3)
             object_dict['eff'][hoy] = object_efficiency
 
-    def get_tabular_results(self, search_list, topology, analysis_period, rename_cols=True):
+    def get_tabular_results(self, search_list, topology, analysis_period=None, rename_cols=True):
         """_summary_
 
         Args:
             search_list (list): a list comrpising of options '[surface, string, module]' is the max
             topology (_type_): the electrical topology
-            analysis_period (_type_): an anlysis period to filter to final results df
+            analysis_period (_type_): an analysis period to filter to final results df
             rename_cols (bool, optional): will expand column names and include units. Defaults to True.
 
         Returns:
@@ -509,4 +549,7 @@ class PanelizedObject:
         if rename_cols == True:
             results_df = results_df.rename(columns=rename_dict)
 
-        return results_df.loc[analysis_period]
+        if analysis_period == None:
+            return results_df
+        else:
+            return results_df.loc[analysis_period]

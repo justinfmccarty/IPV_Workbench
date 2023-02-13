@@ -15,10 +15,13 @@ class Cell:
         self.iv_library_resolution = None
         self.vectorized_retrieve_curve = np.vectorize(self.retrieve_curve, excluded='self')
 
+
+
     def assign_parameters(self):
         # TODO map datatypes to value assignment
         for k, v in self.parameters_dict.items():
             setattr(self, k, v)
+        self.cell_area = self.width * self.height
 
     def assign_iv_library(self, profile_path, write_library=True):
         conditions = utils.create_conditions_map()
@@ -34,10 +37,10 @@ class Cell:
                 key = f"{irrad},{temp}"
                 simulation_results[key] = {"i": [],
                                            "v": []}
-                results = sim.simulate_cell_curve(self.parameters_dict,
-                                                  irrad,
-                                                  temp,
-                                                  self.curve_resolution)
+                results = sim.solve_iv_curve(self.parameters_dict,
+                                             irrad,
+                                             temp,
+                                             self.curve_resolution)
                 results = np.array(results)
                 simulation_results[key]['i'] = list(results[0, :])
                 simulation_results[key]['v'] = list(results[1, :])

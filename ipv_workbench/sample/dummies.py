@@ -97,9 +97,9 @@ def generate_sample_building_dict(n_surfaces, n_strings, n_modules):
     base_dict = {'BUILDING':
                      {"DETAILS": {},
                       'YIELD': {'central_inverter': utils.generate_empty_results_dict(target='OBJECT'),
-                                      'string_inverter': utils.generate_empty_results_dict(target='OBJECT'),
-                                      'micro_inverter': utils.generate_empty_results_dict(target='OBJECT')
-                                      },
+                                'string_inverter': utils.generate_empty_results_dict(target='OBJECT'),
+                                'micro_inverter': utils.generate_empty_results_dict(target='OBJECT')
+                                },
                       "CURVES": {'central_inverter': {"Isys": {}, "Vsys": {}},
                                  'string_inverter': {"Isys": {}, "Vsys": {}},
                                  'micro_inverter': {"Isys": {}, "Vsys": {}}
@@ -165,10 +165,12 @@ def generate_sample_module_dict(n_rows=6, n_cols=20, module_template='a1'):
         "CELLSIRRADDIFFUSE": module_irrad_diffuse,
         "CELLSIRRADEFF": module_irrad_eff,
         "CELLSTEMP": module_temps,
-        "YIELD": {'central_inverter': utils.generate_empty_results_dict(target='MODULE'),
-                        'string_inverter': utils.generate_empty_results_dict(target='MODULE'),
-                        'micro_inverter': utils.generate_empty_results_dict(target='MODULE')},
-        "CURVES": {'central_inverter': {"Imod": {}, "Vmod": {}},
+        "YIELD": {'initial_simulation': utils.generate_empty_results_dict(target='MODULE'),
+                  'central_inverter': utils.generate_empty_results_dict(target='MODULE'),
+                  'string_inverter': utils.generate_empty_results_dict(target='MODULE'),
+                  'micro_inverter': utils.generate_empty_results_dict(target='MODULE')},
+        "CURVES": {'initial_simulation': {"Imod": {}, "Vmod": {}},
+                   'central_inverter': {"Imod": {}, "Vmod": {}},
                    'string_inverter': {"Imod": {}, "Vmod": {}},
                    'micro_inverter': {"Imod": {}, "Vmod": {}}
                    }

@@ -1,14 +1,14 @@
 import numpy as np
 
 
-def calc_series(iv_curves, cell, diode_threshold=None, bypass=True):
+def calc_series(iv_curves, breakdown_voltage, diode_threshold=None, bypass=True):
     # I_data = curves[:, :, 0]
     # V_data = curves[:, :, 1]
     I_data = iv_curves[0, :, :]
     V_data = iv_curves[1, :, :]
 
     substring_Isc = calc_short_circuit(iv_curves)
-    substring_Imax = calc_current_max(iv_curves, cell)
+    substring_Imax = calc_current_max(iv_curves, breakdown_voltage)
 
     Isub, Vsub = assemble_series(I_data,
                                  V_data,
@@ -16,7 +16,7 @@ def calc_series(iv_curves, cell, diode_threshold=None, bypass=True):
                                  np.max(substring_Imax))
     if bypass == True:
         if diode_threshold is None:
-            diode_threshold = cell.diode_threshold
+            diode_threshold = -0.5
         Vsub = np.clip(Vsub, a_min=diode_threshold, a_max=None)
     else:
         pass
@@ -138,12 +138,12 @@ def calc_short_circuit(iv_curves):
     return np.array(substring_Isc)
 
 
-def calc_current_max(iv_curves, cell):
+def calc_current_max(iv_curves, breakdown_voltage):
     # substring_Imax = [np.interp(cell.breakdown_voltage,
     #                         sub[:,1], # V curve valeus
     #                         sub[:,0]) # I curve values
     #                 for sub in iv_curves]
-    substring_Imax = [np.interp(cell.breakdown_voltage,
+    substring_Imax = [np.interp(breakdown_voltage,
                                 iv_curves[1][c],
                                 iv_curves[0][c])
                       for c in range(0, iv_curves.shape[1])]

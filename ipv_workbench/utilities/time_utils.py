@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 
+
 def create_datetime(start="01-01-2023-00:00", end="12-31-2023-23:00", freq='H', override_leap=False):
     if override_leap == False:
         if pd.Timestamp(start).is_leap_year:
@@ -29,7 +30,7 @@ def create_datetime(start="01-01-2023-00:00", end="12-31-2023-23:00", freq='H', 
 
 
 def hoy_to_date(hoy, year=2023):
-    return pd.Timestamp(f'{year}-01-01')+pd.to_timedelta(hoy, unit='H')
+    return pd.Timestamp(f'{year}-01-01') + pd.to_timedelta(hoy, unit='H')
 
 
 def get_hoy(timestamp):
@@ -42,6 +43,7 @@ def get_hoy(timestamp):
     delta = np.datetime64(timestamp) - np.datetime64(f"{year}-01-01")
     return delta.astype('timedelta64[h]').astype(np.int32)
 
+
 def create_analysis_period(start_date, end_date):
     """
     :param start_date: a string input should be in the form 'YYYY-MM-DD-HH:MM'
@@ -52,8 +54,8 @@ def create_analysis_period(start_date, end_date):
 
 
 def create_timestep_chunks(total_timesteps, ncpu):
-    incre = int(total_timesteps/ncpu)
-    incre_range = range(0,total_timesteps,incre)
-    incre_chunks = [np.arange(i,i+incre) for i in incre_range]
+    incre = int(total_timesteps / ncpu)
+    incre_range = range(0, total_timesteps, incre)
+    incre_chunks = [np.arange(i, i + incre) for i in incre_range]
 
     return incre_chunks
