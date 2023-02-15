@@ -142,12 +142,13 @@ def generate_sample_building_dict(n_surfaces, n_strings, n_modules):
     return base_dict
 
 
-def generate_sample_module_dict(n_rows=6, n_cols=20, module_template='a1'):
+def generate_sample_module_dict(n_rows=6, n_cols=20, module_template='Mono'):
     tmy_file = os.path.join(os.path.dirname(__file__),
                             "zurich_2007_2021.epw")
     tmy_df = utils.tmy_to_dataframe(tmy_file)
-    submodule_map, diode_pathways_map = generate_sample_module_maps(
-        n_rows, n_cols, module_template)
+    # submodule_map, diode_pathways_map = generate_sample_module_maps(
+    #     n_rows, n_cols, module_template)
+    submodule_map, subdiode_map, subcell_map = utils.read_map_excel(module_template)
     module_irrad_direct = generate_sample_module_irrad('direct', n_rows, n_cols)
     module_irrad_diffuse = generate_sample_module_irrad('diffuse', n_rows, n_cols)
     module_irrad_eff = calculations.calculate_effective_irradiance(module_irrad_direct, module_irrad_diffuse)
@@ -157,7 +158,8 @@ def generate_sample_module_dict(n_rows=6, n_cols=20, module_template='a1'):
         "LAYERS": {},
         "MAPS": {
             "SUBMODULES": submodule_map,
-            "DIODES": diode_pathways_map
+            "DIODES": diode_map,
+            "SUBCELLS": subcell_map,
         },
         "CELLSXYZ": [],
         "CELLSNORMALS": [],

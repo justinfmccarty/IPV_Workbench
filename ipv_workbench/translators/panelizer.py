@@ -23,6 +23,7 @@ class PanelizedObject:
 
         self.object_type = list(self.panelizer_dict.keys())[0]
         self.object_surfaces = list(self.panelizer_dict[self.object_type]['SURFACES'].keys())
+        self.object_name = self.panelizer_dict['BUILDING']['NAME']
         self.cell = None
         self.module = None
         self.topology = None
