@@ -297,9 +297,9 @@ def create_voltage_range(sde_args, kwargs, curve_pts=1000):
 
 
 def read_map_excel(file_path):
-    submodule_map = pd.read_excel(file_path, header=None, sheet_name='submodule').to_numpy().tolist()
-    subdiode_map = pd.read_excel(file_path, header=None, sheet_name='subdiode').to_numpy().tolist()
-    subcell_map = pd.read_excel(file_path, header=None, sheet_name='subcell').to_numpy().tolist()
+    submodule_map = pd.read_excel(file_path, header=None, sheet_name='submodule').to_numpy()#.tolist()
+    subdiode_map = pd.read_excel(file_path, header=None, sheet_name='subdiode').to_numpy()#.tolist()
+    subcell_map = pd.read_excel(file_path, header=None, sheet_name='subcell').to_numpy()#.tolist()
     return submodule_map, subdiode_map, subcell_map
 
 
@@ -345,3 +345,13 @@ def build_full_ill(file_path_sun_up_hours, ill_df):
     del irrad_df['Sunny']
     del irrad_df['HOY']
     return irrad_df
+
+def get_cec_data(cec_key=None, file_path=None):
+    if file_path is None:
+        mod_df = pvlib.pvsystem.retrieve_sam("CECMod")
+    else:
+        mod_df = pd.read_csv(file_path, index_col='Unnamed: 0')
+    if cec_key is None:
+        return mod_df
+    else:
+        return mod_df[cec_key]

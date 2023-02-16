@@ -8,6 +8,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 import pvlib
+from scipy.spatial.distance import cdist
 
 """
 This script will allow to consider the angle of incidence correction for modules.
@@ -22,6 +23,16 @@ Idea:   The direct-direct sunlight on a sensor point has a certain incidence ang
 
 @author: Linus Walker
 """
+
+def collect_raw_irradiance(pv_cells_xyz_arr, sensor_pts_xyz_arr, sensor_pts_irradiance_arr):
+    cdist_arr = cdist(pv_cells_xyz_arr, sensor_pts_xyz_arr)
+    first = cdist_arr.argsort()[:,0]
+    second = cdist_arr.argsort()[:,1]
+    third = cdist_arr.argsort()[:,2]
+    irrad_cell_mean = (sensor_pts_irradiance_arr[first] + sensor_pts_irradiance_arr[second] + sensor_pts_irradiance_arr[third]) / 3
+    return irrad_cell_mean
+
+
 #
 #
 # # This function uses a simplified approach in the calculation of angles and can be off value by some degrees
@@ -113,6 +124,7 @@ def angle_between_vectors(vector1, vector2):
 
 # Azimuth = zero at North clockwise positive
 def vector_to_tilt_and_azimuth(avector):
+    #TODO modifiy this to take an array and return an array in case of non-planar module
     if avector[0] == 0 and avector[1] == 0:
         tilt = 0
         azimuth = 0  # technically this is wrong
@@ -145,11 +157,14 @@ def vector_to_tilt_and_azimuth(avector):
 
 # be sure to give theta_m in rad!!!
 def k_martin_ruiz(theta_m, aa_r):
-    if theta_m > np.pi / 2:
-        return 0
-    else:
-        k = np.exp(1 / aa_r) * (1 - np.exp(-np.cos(theta_m) / aa_r)) / (np.exp(1 / aa_r) - 1)
-        return k
+    # if theta_m > np.pi / 2:
+    #     return 0
+    # else:
+    #     k = np.exp(1 / aa_r) * (1 - np.exp(-np.cos(theta_m) / aa_r)) / (np.exp(1 / aa_r) - 1)
+    #     return k
+    k = np.where(theta_m > np.pi / 2, 0,
+             np.exp(1 / aa_r) * (1 - np.exp(-np.cos(theta_m) / aa_r)) / (np.exp(1 / aa_r) - 1))
+    return k
 
 
 k_list_global = []
@@ -161,15 +176,16 @@ def calc_angular_loss_martin_ruiz(G_dir, G_diff, theta, a_r=0.17):
     # k2 =  k_martin_ruiz(np.pi/3, aa_r) (60 degrees)
     k2 = 0.94984480313119235
     G_eff = G_dir * k1 + G_diff * k2  # pi/3 is assumed for diffuse irrad
-    if G_eff <0:
-        print("ALERT")
-        print("e_dir is ", G_dir)
-        print("e_diff is ", G_diff)
-        print("e_eff is ", G_eff)
-        print("k1 is ", k1)
-        return 0
-    else:
-        return G_eff
+    return np.where(G_eff < 0, 0, G_eff)
+    # if G_eff <0:
+    #     print("ALERT")
+    #     print("e_dir is ", G_dir)
+    #     print("e_diff is ", G_diff)
+    #     print("e_eff is ", G_eff)
+    #     print("k1 is ", k1)
+    #     return 0
+    # else:
+    #     return G_eff
 
 
 # def aoi_modifier(latitude, longitude, sensor_points, sen_dir_ill_total, sen_dir_ill_direct,
@@ -316,9 +332,7 @@ def front_cover_loss(irradiance, color):
     loss_factor = loss_table.loc[color]
     return irradiance * (1 - loss_factor).values
 
-def calculate_effective_irradiance(G_dir, G_diff, evaluated_normal_vector, hoy, epw_file, front_cover_color="clear"):
-    tmy_location = utils.tmy_location(epw_file)
-    tmy = utils.tmy_to_dataframe(epw_file)
+def calculate_effective_irradiance_single_step(G_dir, G_diff, evaluated_normal_vector, hoy, tmy_location, pressure, drybulb, front_cover_color="clear"):
     # part 1: account for front cover loss
     if front_cover_color=='clear':
         G_eff_dir = G_dir
@@ -328,14 +342,15 @@ def calculate_effective_irradiance(G_dir, G_diff, evaluated_normal_vector, hoy, 
         G_eff_diff = front_cover_loss(G_diff, front_cover_color)
 
     # part 2: angle of incidence mod
+    # TODO modifiy this to take an array and return an array in case of non-planar module
     surface_azimuth, surface_tilt = vector_to_tilt_and_azimuth(evaluated_normal_vector)
     solar_position_hoy = pvlib.solarposition.get_solarposition(time_utils.hoy_to_date(hoy),
                                                                tmy_location['lat'],
                                                                tmy_location['lon'],
                                                                altitude=tmy_location['elevation'],
-                                                               pressure=tmy.loc[hoy]['atmos_Pa'],
+                                                               pressure=pressure,
                                                                method='nrel_numpy',
-                                                               temperature=tmy.loc[hoy]['drybulb_C']
+                                                               temperature=drybulb
                                                                )
 
     surface_tilt_deg = np.rad2deg(surface_tilt)
@@ -346,4 +361,36 @@ def calculate_effective_irradiance(G_dir, G_diff, evaluated_normal_vector, hoy, 
     aoi_mod_deg = pvlib.irradiance.aoi(surface_tilt_deg, surface_azimuth_deg, solar_zenith_deg, solar_azimuth_deg)
     aoi_mod_rad = np.deg2rad(aoi_mod_deg)
     return calc_angular_loss_martin_ruiz(G_eff_dir, G_eff_diff, aoi_mod_rad, a_r=0.17)
+
+def calculate_effective_irradiance_timeseries(G_dir, G_diff, evaluated_normal_vector, hoy, tmy_location, pressure, drybulb, front_cover_color="clear"):
+    # part 1: account for front cover loss
+    if front_cover_color=='clear':
+        G_eff_dir = G_dir
+        G_eff_diff = G_diff
+    else:
+        G_eff_dir = front_cover_loss(G_dir, front_cover_color)
+        G_eff_diff = front_cover_loss(G_diff, front_cover_color)
+
+    # part 2: angle of incidence mod
+    # TODO modifiy this to take an array and return an array in case of non-planar module
+    surface_azimuth, surface_tilt = vector_to_tilt_and_azimuth(evaluated_normal_vector)
+
+    solar_position_hoy = pvlib.solarposition.get_solarposition(time_utils.hoy_to_date(hoy),
+                                                               tmy_location['lat'],
+                                                               tmy_location['lon'],
+                                                               altitude=tmy_location['elevation'],
+                                                               pressure=pressure,
+                                                               method='nrel_numpy',
+                                                               temperature=drybulb
+                                                               )
+
+    surface_tilt_deg = np.rad2deg(surface_tilt)
+    surface_azimuth_deg = np.rad2deg(surface_azimuth)
+    solar_zenith_deg = solar_position_hoy['apparent_zenith'].values
+    solar_azimuth_deg = solar_position_hoy['azimuth'].values
+
+    aoi_mod_deg = pvlib.irradiance.aoi(surface_tilt_deg, surface_azimuth_deg, solar_zenith_deg, solar_azimuth_deg)
+    aoi_mod_rad = np.deg2rad(aoi_mod_deg)
+    return calc_angular_loss_martin_ruiz(G_eff_dir, G_eff_diff, aoi_mod_rad, a_r=0.17)
+
 

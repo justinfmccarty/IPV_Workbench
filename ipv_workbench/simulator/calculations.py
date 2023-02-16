@@ -30,11 +30,14 @@ def account_for_film(direct_irrad, diffuse_irrad):
 # def super_cool_function(load_rnn, irrad, temp, features_lsit):
 #     return cell_tempreature
 
-def calculate_cell_temperature(G_effective, T_ambient, Wind_speed, Pretrained_model, method="ross"):
+def calculate_cell_temperature(G_effective, T_ambient, Wind_speed=None, Pretrained_model=None, method="ross"):
     G_effective = G_effective.T
     if method == "ross":
         return ross_temperature_correction(G_effective, T_ambient)
     elif method == "skoplaki":
+        if Wind_speed is None:
+            print("Wind Speed required in scalar or same shape as DBT")
+            return None
         return skoplaki_temperature_correction(G_effective, T_ambient, Wind_speed)
     elif method == "simple":
         return simple_temperature_correction(G_effective, T_ambient)

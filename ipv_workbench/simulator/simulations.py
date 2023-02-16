@@ -63,7 +63,7 @@ def solve_iv_curve(parameters, Geff, Tcell, ivcurve_pnts=1000):
     return np.array(I), np.array(V)
 
 
-def solve_cells(parameters, Geff, Tcell):
+def solve_cells(parameters, Geff, Tcell, ivcurve_pnts=1000):
     """
     Use De Soto and Bishop to simulate a full IV curve with both
     forward and reverse bias regions.
@@ -95,7 +95,7 @@ def solve_cells(parameters, Geff, Tcell):
         'breakdown_exp': parameters['breakdown_exp'],
         'breakdown_voltage': parameters['breakdown_voltage'],
     }
-    evaluated_voltages = utils.create_voltage_range(sde_args, kwargs)
+    evaluated_voltages = utils.create_voltage_range(sde_args, kwargs, curve_pts=ivcurve_pnts)
 
     # Basic assumption here: Module IV-curve can be converted to a cell IV-curve by
     # dividing the module voltage by the number of cells

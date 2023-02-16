@@ -5,10 +5,10 @@ import os
 import numpy as np
 import pandas as pd
 import multiprocessing as mp
-
+import glob
 
 class PanelizedObject:
-    def __init__(self, panelizer_input):
+    def __init__(self, panelizer_input, project_folder):
         if type(panelizer_input) is dict:
             self.input_type = 'dict'
             self.panelizer_file = None
@@ -23,7 +23,10 @@ class PanelizedObject:
 
         self.object_type = list(self.panelizer_dict.keys())[0]
         self.object_surfaces = list(self.panelizer_dict[self.object_type]['SURFACES'].keys())
-        self.object_name = self.panelizer_dict['BUILDING']['NAME']
+        if self.object_type=='BUILDING':
+            self.object_name = f"B{self.panelizer_dict[self.object_type]['NAME']}"
+        else:
+            self.object_name = f"O{self.panelizer_dict[self.object_type]['NAME']}"
         self.cell = None
         self.module = None
         self.topology = None
@@ -34,7 +37,19 @@ class PanelizedObject:
         self.multiprocess = True
         self.simulation_suite = False
         self.simulation_suite_topologies = ['micro_inverter', 'string_inverter', 'central_inverter']
-        self.correct_maps()
+        # self.correct_maps()
+        self.PROJECT_DIR = project_folder
+        self.PANELIZER_DIR = os.path.join(self.PROJECT_DIR,"panelizer",self.object_name)
+        self.RESOURCES_DIR = os.path.join(self.PROJECT_DIR,"resources")
+        self.RADIANCE_DIR = os.path.join(self.PROJECT_DIR,"radiance_models",self.object_name)
+        self.RESULTS_DIR = os.path.join(self.PROJECT_DIR,"results",self.object_name)
+
+        self.tmy_file = glob.glob(os.path.join(self.RESOURCES_DIR,"tmy", "*.epw"))[0]
+        self.map_files = glob.glob(os.path.join(self.RESOURCES_DIR, "map_files", "*.xls*"))
+        self.tmy_dataframe = utils.tmy_to_dataframe(self.tmy_file)
+
+        self.CEC_DATA = os.path.join(self.RESOURCES_DIR, "cec_database_local.csv")
+        self.MODULE_CELL_DATA = os.path.join(self.RESOURCES_DIR, "cell_module_datasheet.csv")
 
     def correct_maps(self):
         if self.input_type == 'file':
