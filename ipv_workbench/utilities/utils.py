@@ -4,9 +4,15 @@ import json
 import pickle
 import pandas as pd
 from operator import itemgetter
-
+import os
 import pvlib
 
+
+def directory_creator(dir_path):
+    if os.path.exists(dir_path):
+        pass
+    else:
+        os.mkdir(dir_path)
 
 def ts_8760(year=2022):
     index = pd.date_range(start=f"01-01-{year} 00:00", end=f"12-31-{year} 23:00", freq="h")
@@ -165,8 +171,14 @@ def find_matching_key(all_keys, conditions, search_irrad, search_temp):
 
 def read_pickle(file_path, read_method='rb'):
     with open(file_path, read_method) as fp:
-        loaded_file = pickle.load(fp)
-    return loaded_file
+        cucumber = pickle.load(fp)
+    return cucumber
+
+def write_pickle(cucumber, file_path, write_method="wb"):
+    with open(file_path, write_method) as fp:
+        pickle.dump(cucumber, fp, protocol=pickle.HIGHEST_PROTOCOL)
+    return file_path
+
 
 
 def tmy_to_dataframe(path_data):

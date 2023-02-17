@@ -30,10 +30,11 @@ def account_for_film(direct_irrad, diffuse_irrad):
 # def super_cool_function(load_rnn, irrad, temp, features_lsit):
 #     return cell_tempreature
 
-def calculate_cell_temperature(G_effective, T_ambient, Wind_speed=None, Pretrained_model=None, method="ross"):
-    G_effective = G_effective.T
-    if method == "ross":
-        return ross_temperature_correction(G_effective, T_ambient)
+def calculate_cell_temperature(G_effective, T_ambient, T_noct=45, Wind_speed=None, Pretrained_model=None, method="ross"):
+    if method == "ross_simple":
+        return ross_temperature_correction_simple(G_effective, T_ambient)
+    elif method == "ross":
+        return ross_temperature_correction(G_effective, T_ambient, T_noct=T_noct)
     elif method == "skoplaki":
         if Wind_speed is None:
             print("Wind Speed required in scalar or same shape as DBT")
@@ -45,7 +46,7 @@ def calculate_cell_temperature(G_effective, T_ambient, Wind_speed=None, Pretrain
     #     return super_cool_function(Pretrained_model, G_effective, T_ambient)
     else:
         print("No method specified, defaulting to Ross.")
-        return ross_temperature_correction(G_effective, T_ambient)
+        return ross_temperature_correction_simple(G_effective, T_ambient)
 
 
 def simple_temperature_correction(G_effective, T_ambient, G_stc=1000, T_cell_stc=40, T_ambient_stc=25):
@@ -63,8 +64,12 @@ def simple_temperature_correction(G_effective, T_ambient, G_stc=1000, T_cell_stc
     """
     return T_ambient + (G_effective / G_stc) * (T_cell_stc - T_ambient_stc)
 
+def ross_temperature_correction(G_effective, T_ambient, T_noct=45):
+    # factor of 0.1 converts irradiance from W/m2 to mW/cm2
+    return T_ambient + (T_noct - 20.) / 80. * G_effective * 0.1
 
-def ross_temperature_correction(G_effective, T_ambient, k=0.0538):
+def ross_temperature_correction_simple(G_effective, T_ambient, k=0.0538):
+
     return T_ambient + (k * G_effective)
 
 
