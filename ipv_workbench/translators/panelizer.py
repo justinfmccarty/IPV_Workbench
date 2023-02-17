@@ -1,5 +1,5 @@
 from ipv_workbench.utilities import utils, circuits, time_utils
-from ipv_workbench.simulator import calculations as ipv_calc
+from ipv_workbench.simulator import calculations as ipv_calc, compile_mp, single_module_mp
 from ipv_workbench.simulator import simulations
 from ipv_workbench.simulator import simulations_mp
 from ipv_workbench.translators import mapping_irradiance as ipv_irrad
@@ -600,8 +600,10 @@ def compile_system(panelizer_object, write_system=False, mp=False):
     for surface in panelizer_object.get_surfaces():
         # load radiance data
         rad_surface_key = panelizer_object.get_dict_instance([surface])['DETAILS']['radiance_surface_label']
-        total_ill = ipv_irrad.load_irradiance_file(panelizer_object.RADIANCE_DIR, rad_surface_key, "total").loc[timeseries]
-        direct_ill = ipv_irrad.load_irradiance_file(panelizer_object.RADIANCE_DIR, rad_surface_key, "direct").loc[timeseries]
+        total_ill = ipv_irrad.load_irradiance_file(panelizer_object.RADIANCE_DIR, rad_surface_key, "total").loc[
+            timeseries]
+        direct_ill = ipv_irrad.load_irradiance_file(panelizer_object.RADIANCE_DIR, rad_surface_key, "direct").loc[
+            timeseries]
         diffuse_ill = pd.DataFrame(np.where(total_ill < direct_ill, direct_ill * 0.01, total_ill - direct_ill))
         grid_pts = ipv_irrad.load_grid_file(panelizer_object.RADIANCE_DIR, rad_surface_key)
 
@@ -647,14 +649,37 @@ def compile_system(panelizer_object, write_system=False, mp=False):
                         'irrad'] = module_g_dict
             else:
                 if len(modules) >= panelizer_object.ncpu:
-                    simulations_mp.compile_system_mp_wrapper_module_loop(panelizer_object, surface, string, tmy_location, dbt, psl,
-                                                             grid_pts, direct_ill, diffuse_ill)
+                    compile_mp.main(panelizer_object, surface, string, tmy_location, dbt, psl, grid_pts, direct_ill,
+                                    diffuse_ill)
+                    # simulations_mp.compile_system_mp_wrapper_module_loop(panelizer_object, surface, string, tmy_location, dbt, psl,
+                    #                                          grid_pts, direct_ill, diffuse_ill)
+
                 else:
                     # loop through individual modules and run the MP by chunking the timeseries
+                    for module_name in modules:
+                        module_dict = panelizer_object.get_dict_instance([surface, string, module_name])
+                        pv_cells_xyz_arr = np.array(panelizer_object.get_cells_xyz(surface, string, module_name))
 
-                    # placeholder for now while developing compile_system_mp_wrapper_timeseries_loop
-                    simulations_mp.compile_system_mp_wrapper_module_loop(panelizer_object, surface, string, tmy_location, dbt, psl,
-                                                             grid_pts, direct_ill, diffuse_ill)
+                        mp_results = single_module_mp.main(panelizer_object,
+                                                           string,
+                                                           module_dict,
+                                                           pv_cells_xyz_arr,
+                                                           tmy_location, dbt, psl,
+                                                           grid_pts,
+                                                           direct_ill, diffuse_ill,
+                                                           base_parameters,
+                                                           custom_module_data,
+                                                           default_submodule_map,
+                                                           default_diode_map,
+                                                           default_subcell_map,
+                                                           cell_type)
+                        module_i_dict, module_v_dict, module_g_dict = mp_results
+                        module_dict['CURVES']["initial_simulation"][
+                            'Imod'] = module_i_dict
+                        module_dict['CURVES']["initial_simulation"][
+                            'Vmod'] = module_v_dict
+                        module_dict['YIELD']["initial_simulation"][
+                            'irrad'] = module_g_dict
 
         if write_system == True:
             print("Panelizer has completed writing input data into dict. File will now be saved.")
@@ -665,12 +690,14 @@ def compile_system(panelizer_object, write_system=False, mp=False):
 
 
 def compile_system_single_core(module_dict, timeseries, tmy_location, dbt, psl, pv_cells_xyz_arr, grid_pts, direct_ill,
-                               diffuse_ill, base_parameters, custom_module_data, default_submodule_map, default_diode_map,
+                               diffuse_ill, base_parameters, custom_module_data, default_submodule_map,
+                               default_diode_map,
                                default_subcell_map, cell_type):
-
     G_eff_ann, C_temp_ann_arr = build_module_features(module_dict, timeseries, tmy_location, dbt, psl, pv_cells_xyz_arr,
-                                                      grid_pts, direct_ill, diffuse_ill, base_parameters, custom_module_data,
-                                                      default_submodule_map, default_diode_map, default_subcell_map, cell_type)
+                                                      grid_pts, direct_ill, diffuse_ill, base_parameters,
+                                                      custom_module_data,
+                                                      default_submodule_map, default_diode_map, default_subcell_map,
+                                                      cell_type)
 
     module_parameters = module_dict['PARAMETERS']
     module_parameters['minimum_irradiance_cell'] = 5
@@ -743,7 +770,7 @@ def build_module_features(module_dict, timeseries, tmy_location, dbt, psl, pv_ce
                           default_subcell_map, cell_type):
     # build parameters for module
     # module_dict = panelizer_object.get_dict_instance([surface, string, module])
-    if len(pv_cells_xyz_arr.shape)>2:
+    if len(pv_cells_xyz_arr.shape) > 2:
         pv_cells_xyz_arr = pv_cells_xyz_arr[0]
 
     module_details = module_dict['DETAILS']
@@ -786,7 +813,7 @@ def build_module_features(module_dict, timeseries, tmy_location, dbt, psl, pv_ce
         pass
 
     base_parameters['cell_area'] = (base_parameters['cell_area'] / (
-                base_parameters['n_rows_ideal'] * base_parameters['n_cols_ideal'])) * base_parameters['total_cells']
+            base_parameters['n_rows_ideal'] * base_parameters['n_cols_ideal'])) * base_parameters['total_cells']
     module_dict['PARAMETERS'] = base_parameters
     module_parameters = module_dict['PARAMETERS']
 
@@ -796,10 +823,10 @@ def build_module_features(module_dict, timeseries, tmy_location, dbt, psl, pv_ce
 
     G_dir_ann = ipv_irrad.collect_raw_irradiance(pv_cells_xyz_arr,
                                                  sensor_pts_xyz_arr,
-                                                 direct_ill.T)#.values)
+                                                 direct_ill.T)  # .values)
     G_diff_ann = ipv_irrad.collect_raw_irradiance(pv_cells_xyz_arr,
                                                   sensor_pts_xyz_arr,
-                                                  diffuse_ill.T)#.values)
+                                                  diffuse_ill.T)  # .values)
     # calculate effective irradiance
     # tmy_location = utils.tmy_location(panelizer_object.tmy_file)
     # dbt = panelizer_object.tmy_dataframe['drybulb_C'].values
@@ -827,7 +854,7 @@ def build_module_features(module_dict, timeseries, tmy_location, dbt, psl, pv_ce
     nrows = module_parameters['n_rows']
 
     hoy_arrs = []
-    for hoy_n in np.arange(0,len(timeseries)):
+    for hoy_n in np.arange(0, len(timeseries)):
         G_eff_hoy_arr = np.round(np.fliplr(G_eff_ann[:, hoy_n].reshape(-1, nrows)).T, 2)
         hoy_arrs.append(G_eff_hoy_arr)
 
