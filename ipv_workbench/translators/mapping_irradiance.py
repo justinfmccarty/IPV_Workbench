@@ -42,6 +42,7 @@ def load_grid_file(bldg_radiance_dir, rad_surface_key):
 
 def collect_raw_irradiance(pv_cells_xyz_arr, sensor_pts_xyz_arr, sensor_pts_irradiance_arr):
     # TODO change this to use rectangular sampling based on cell dimensions
+
     cdist_arr = cdist(pv_cells_xyz_arr, sensor_pts_xyz_arr)
     first = cdist_arr.argsort()[:,0]
     second = cdist_arr.argsort()[:,1]
@@ -225,7 +226,8 @@ def calculate_effective_irradiance_single_step(G_dir, G_diff, evaluated_normal_v
     aoi_mod_rad = np.deg2rad(aoi_mod_deg)
     return calc_angular_loss_martin_ruiz(G_eff_dir, G_eff_diff, aoi_mod_rad, a_r=0.17)
 
-def calculate_effective_irradiance_timeseries(G_dir, G_diff, evaluated_normal_vector, hoy, tmy_location, pressure, drybulb, front_cover_color="clear"):
+def calculate_effective_irradiance_timeseries(G_dir, G_diff, evaluated_normal_vector, hoy,
+                                              tmy_location, pressure, drybulb, front_cover_color="clear"):
     """
     Author: Justin McCarty
     :param G_dir:

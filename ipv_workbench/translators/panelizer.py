@@ -4,12 +4,13 @@ from ipv_workbench.simulator import simulations
 from ipv_workbench.simulator import simulations_mp
 from ipv_workbench.translators import mapping_irradiance as ipv_irrad
 from ipv_workbench.translators import module_mapping as ipv_mm
-
+from tqdm import tqdm, notebook
 import os
 import numpy as np
 import pandas as pd
 import multiprocessing as mp
 import glob
+
 
 class PanelizedObject:
     def __init__(self, panelizer_input, project_folder):
@@ -28,7 +29,7 @@ class PanelizedObject:
 
         self.object_type = list(self.panelizer_dict.keys())[0]
         self.object_surfaces = list(self.panelizer_dict[self.object_type]['SURFACES'].keys())
-        if self.object_type=='BUILDING':
+        if self.object_type == 'BUILDING':
             self.object_name = f"B{self.panelizer_dict[self.object_type]['NAME']}"
         else:
             self.object_name = f"O{self.panelizer_dict[self.object_type]['NAME']}"
@@ -44,22 +45,24 @@ class PanelizedObject:
         self.simulation_suite_topologies = ['micro_inverter', 'string_inverter', 'central_inverter']
         # self.correct_maps()
         self.PROJECT_DIR = project_folder
-        self.PANELIZER_DIR = os.path.join(self.PROJECT_DIR,"panelizer",self.object_name)
+        self.PANELIZER_DIR = os.path.join(self.PROJECT_DIR, "panelizer", self.object_name)
         utils.directory_creator(self.PANELIZER_DIR)
-        self.RESOURCES_DIR = os.path.join(self.PROJECT_DIR,"resources")
+        self.RESOURCES_DIR = os.path.join(self.PROJECT_DIR, "resources")
         utils.directory_creator(self.RESOURCES_DIR)
-        self.RADIANCE_DIR = os.path.join(self.PROJECT_DIR,"radiance_models",self.object_name)
+        self.RADIANCE_DIR = os.path.join(self.PROJECT_DIR, "radiance_models", self.object_name)
         utils.directory_creator(self.RADIANCE_DIR)
-        self.SYSTEMS_DIR = os.path.join(self.PROJECT_DIR,"systems")
+        self.SYSTEMS_DIR = os.path.join(self.PROJECT_DIR, "systems")
         utils.directory_creator(self.SYSTEMS_DIR)
-        self.SYSTEM_DIR = os.path.join(self.SYSTEMS_DIR,self.object_name)
+        self.SYSTEM_DIR = os.path.join(self.SYSTEMS_DIR, self.object_name)
         utils.directory_creator(self.SYSTEM_DIR)
-        self.RESULTS_DIR = os.path.join(self.PROJECT_DIR,"results",self.object_name)
-        utils.directory_creator(self.RESULTS_DIR)
+        self.RESULT_DIR = os.path.join(self.PROJECT_DIR, "results")
+        utils.directory_creator(self.RESULT_DIR)
+        self.RESULT_DIR = os.path.join(self.PROJECT_DIR, "results", self.object_name)
+        utils.directory_creator(self.RESULT_DIR)
 
         self.system_file = os.path.join(self.SYSTEM_DIR, self.file_name)
 
-        self.tmy_file = glob.glob(os.path.join(self.RESOURCES_DIR,"tmy", "*.epw"))[0]
+        self.tmy_file = glob.glob(os.path.join(self.RESOURCES_DIR, "tmy", "*.epw"))[0]
         self.map_files = glob.glob(os.path.join(self.RESOURCES_DIR, "map_files", "*.xls*"))
         self.tmy_dataframe = utils.tmy_to_dataframe(self.tmy_file)
 
@@ -73,7 +76,7 @@ class PanelizedObject:
                 for string in strings:
                     modules = self.get_modules(surface, string)
                     for module in modules:
-                        mod_dict = self.get_dict_instance([surface,string,module])
+                        mod_dict = self.get_dict_instance([surface, string, module])
                         mod_dict['MAPS']['DIODES'] = utils.flip_maps(mod_dict['MAPS']['DIODES'])
                         mod_dict['MAPS']['SUBMODULES'] = utils.flip_maps(mod_dict['MAPS']['SUBMODULES'])
                         mod_dict['MAPS']['SUBCELLS'] = utils.flip_maps(mod_dict['MAPS']['SUBCELLS'])
@@ -586,142 +589,283 @@ class PanelizedObject:
             return results_df.loc[analysis_period]
 
 
-def compile_system(panelizer_object,write_system):
+def compile_system(panelizer_object, write_system=False, mp=False):
     # TODO parallelize the entire workflow
+
+    timeseries = panelizer_object.all_hoy
+    tmy_location = utils.tmy_location(panelizer_object.tmy_file)
+    dbt = panelizer_object.tmy_dataframe['drybulb_C'].values[timeseries]
+    psl = panelizer_object.tmy_dataframe['atmos_Pa'].values[timeseries]
+
     for surface in panelizer_object.get_surfaces():
         # load radiance data
         rad_surface_key = panelizer_object.get_dict_instance([surface])['DETAILS']['radiance_surface_label']
-        total_ill = ipv_irrad.load_irradiance_file(panelizer_object.RADIANCE_DIR, rad_surface_key, "total")
-        direct_ill = ipv_irrad.load_irradiance_file(panelizer_object.RADIANCE_DIR, rad_surface_key, "direct")
+        total_ill = ipv_irrad.load_irradiance_file(panelizer_object.RADIANCE_DIR, rad_surface_key, "total").loc[timeseries]
+        direct_ill = ipv_irrad.load_irradiance_file(panelizer_object.RADIANCE_DIR, rad_surface_key, "direct").loc[timeseries]
         diffuse_ill = pd.DataFrame(np.where(total_ill < direct_ill, direct_ill * 0.01, total_ill - direct_ill))
         grid_pts = ipv_irrad.load_grid_file(panelizer_object.RADIANCE_DIR, rad_surface_key)
 
         for string in panelizer_object.get_strings(surface):
-            for module in panelizer_object.get_modules(surface, string):
-                # build parameters for module
-                module_dict = panelizer_object.get_dict_instance([surface, string, module])
-                module_details = module_dict['DETAILS']
+            print(string)
 
-                parameters = utils.get_cec_data(module_details['cec_key'], file_path=panelizer_object.CEC_DATA)
-                custom_module_data = pd.read_csv(panelizer_object.MODULE_CELL_DATA, index_col='scenario').loc[
-                    module_details['module_type']].to_dict()
+            string_dict = panelizer_object.get_dict_instance([surface, string])
+            string_details = string_dict['DETAILS']
 
-                for k, v in custom_module_data.items():
-                    parameters[k] = v
+            modules = panelizer_object.get_modules(surface, string)
 
-                parameters['N_subcells'] = int(max(parameters['Nsubcell_col'], parameters['Nsubcell_row']))
-                for k, v in parameters.items():
-                    if type(v) is str:
-                        try:
-                            parameters[k] = float(v)
-                        except ValueError:
-                            pass
-                parameters['n_cols'] = module_details['n_cols']
-                parameters['n_rows'] = module_details['n_rows']
-                parameters['total_cells'] = parameters['n_cols'] * parameters['n_rows']
-                # TODO recalculate parameters
-                # cell_area                                                 1.99
-                # Wp_m2_cell                                              161.01
-                # module_area                                                2.2
-                # Wp_m2_module # def deteect_subcells()
+            base_parameters = utils.get_cec_data(string_details['cec_key'], file_path=panelizer_object.CEC_DATA)
+            custom_module_data = pd.read_csv(panelizer_object.MODULE_CELL_DATA, index_col='scenario').loc[
+                string_details['module_type']].to_dict()
 
-                # assign subcell counts if present
-                actual_cols = parameters['n_cols']
-                actual_rows = parameters['n_rows']
-                ideal_subcell_col = parameters['Nsubcell_col']
-                ideal_subcell_row = parameters['Nsubcell_row']
-                if ideal_subcell_col > ideal_subcell_row:
-                    # print("Subcells detected for columns.")
-                    parameters['Nsubcell_col'] = actual_cols
-                    parameters['N_subcells'] = actual_cols
-                elif ideal_subcell_col < ideal_subcell_row:
-                    # print("Subcells detected for rows.")
-                    parameters['Nsubcell_row'] = actual_rows
-                    parameters['N_subcells'] = actual_rows
+            module_template = string_details['module_type']
+            cell_type = ipv_mm.get_cell_type(module_template[0])
+            orientation = ipv_mm.get_orientation(module_template[1])
+            map_file = [fp for fp in panelizer_object.map_files if f"{cell_type}_{orientation}" in fp][0]
+            default_submodule_map, default_diode_map, default_subcell_map = utils.read_map_excel(map_file)
+
+            if mp == False:
+                for module_name in modules:
+                    module_dict = panelizer_object.get_dict_instance([surface, string, module_name])
+                    pv_cells_xyz_arr = np.array(panelizer_object.get_cells_xyz(surface, string, module_name))
+
+                    module_i_dict, module_v_dict, module_g_dict = compile_system_single_core(module_dict, timeseries,
+                                                                                             tmy_location, dbt, psl,
+                                                                                             pv_cells_xyz_arr, grid_pts,
+                                                                                             direct_ill, diffuse_ill,
+                                                                                             base_parameters,
+                                                                                             custom_module_data,
+                                                                                             default_submodule_map,
+                                                                                             default_diode_map,
+                                                                                             default_subcell_map,
+                                                                                             cell_type)
+
+                    module_dict['CURVES']["initial_simulation"][
+                        'Imod'] = module_i_dict
+                    module_dict['CURVES']["initial_simulation"][
+                        'Vmod'] = module_v_dict
+                    module_dict['YIELD']["initial_simulation"][
+                        'irrad'] = module_g_dict
+            else:
+                if len(modules) >= panelizer_object.ncpu:
+                    simulations_mp.compile_system_mp_wrapper_module_loop(panelizer_object, surface, string, tmy_location, dbt, psl,
+                                                             grid_pts, direct_ill, diffuse_ill)
                 else:
-                    pass
-                module_dict['PARAMETERS'] = parameters.copy()
-                module_parameters = module_dict['PARAMETERS']
+                    # loop through individual modules and run the MP by chunking the timeseries
 
-                # get direct and diffuse irradiance
-                pv_cells_xyz_arr = np.array(panelizer_object.get_cells_xyz(surface, string, module))
-                sensor_pts_xyz_arr = grid_pts[['X', 'Y', 'Z']].values
+                    # placeholder for now while developing compile_system_mp_wrapper_timeseries_loop
+                    simulations_mp.compile_system_mp_wrapper_module_loop(panelizer_object, surface, string, tmy_location, dbt, psl,
+                                                             grid_pts, direct_ill, diffuse_ill)
 
-                G_dir_ann = ipv_irrad.collect_raw_irradiance(pv_cells_xyz_arr,
-                                                             sensor_pts_xyz_arr,
-                                                             direct_ill.T.values)
-                G_diff_ann = ipv_irrad.collect_raw_irradiance(pv_cells_xyz_arr,
-                                                              sensor_pts_xyz_arr,
-                                                              diffuse_ill.T.values)
+        if write_system == True:
+            print("Panelizer has completed writing input data into dict. File will now be saved.")
+            utils.write_pickle(panelizer_object, panelizer_object.system_file)
+        else:
+            print("Panelizer has completed writing input data into dict. File will not be saved. "
+                  "Rerun with write_system to True to save or use 'utils.write_pickle(panelizer_ibject, panelizer_object.system_file)'")
 
-                # calculate effective irradiance
-                tmy_location = utils.tmy_location(panelizer_object.tmy_file)
-                dbt = panelizer_object.tmy_dataframe['drybulb_C'].values
-                psl = panelizer_object.tmy_dataframe['atmos_Pa'].values
 
-                evaluated_normal_vector = tuple(module_dict['CELLSNORMALS'][0])
-                front_cover = module_dict['LAYERS']['front_film']
+def compile_system_single_core(module_dict, timeseries, tmy_location, dbt, psl, pv_cells_xyz_arr, grid_pts, direct_ill,
+                               diffuse_ill, base_parameters, custom_module_data, default_submodule_map, default_diode_map,
+                               default_subcell_map, cell_type):
 
-                # calcualte the effectivate irradiance for the year
-                G_eff_ann = ipv_irrad.calculate_effective_irradiance_timeseries(G_dir_ann,
-                                                                                G_diff_ann,
-                                                                                evaluated_normal_vector,
-                                                                                panelizer_object.all_hoy,
-                                                                                tmy_location,
-                                                                                psl,
-                                                                                dbt,
-                                                                                front_cover)
+    G_eff_ann, C_temp_ann_arr = build_module_features(module_dict, timeseries, tmy_location, dbt, psl, pv_cells_xyz_arr,
+                                                      grid_pts, direct_ill, diffuse_ill, base_parameters, custom_module_data,
+                                                      default_submodule_map, default_diode_map, default_subcell_map, cell_type)
 
-                # restructure the G_eff arrays following the general shape of the template (top right first)
-                ncols = module_parameters['n_cols']
-                nrows = module_parameters['n_rows']
+    module_parameters = module_dict['PARAMETERS']
+    module_parameters['minimum_irradiance_cell'] = 5
 
-                hoy_arrs = []
-                for hoy_ in np.arange(0, 8760):
-                    G_eff_hoy_arr = np.round(np.fliplr(G_eff_ann[:, hoy_].reshape(-1, nrows)).T, 2)
-                    hoy_arrs.append(G_eff_hoy_arr)
+    module_i_dict = {}
+    module_v_dict = {}
+    module_g_dict = {}
 
-                G_eff_ann = np.array(hoy_arrs)
-
-                # calculate cell temperature
-                C_temp_ann_arr = ipv_calc.calculate_cell_temperature(G_eff_ann,
-                                                                     panelizer_object.tmy_dataframe['drybulb_C'].values[:, None,
-                                                                     None],
-                                                                     method="ross")
-
-                # set into dict
-                module_dict['CELLSTEMP'] = C_temp_ann_arr.copy()
-                module_dict['CELLSIRRADEFF'] = G_eff_ann.copy()  # .reshape((nrows, ncols,  len(po.all_hoy))).copy()
-
-                # set new _maps
-                module_template = module_dict['DETAILS']['module_type']
-                cell_type = ipv_mm.get_cell_type(module_template[0])
-                orientation = ipv_mm.get_orientation(module_template[1])
-                map_file = [fp for fp in panelizer_object.map_files if f"{cell_type}_{orientation}" in fp][0]
-                default_submodule_map, default_diode_map, default_subcell_map = utils.read_map_excel(map_file)
-
-                if ipv_mm.detect_nonstandard_module(module_dict) == 'standard':
-                    # print("Standard module")
-                    module_dict['MAPS']['SUBMODULES'] = default_submodule_map
-                    module_dict['MAPS']['DIODES'] = default_diode_map
-                    module_dict['MAPS']['SUBCELLS'] = default_subcell_map
+    for hoy_n, hoy in enumerate(tqdm(timeseries)):
+        Gmod = G_eff_ann[hoy_n]  # panelizer_object.get_cells_irrad_eff(surface, string, module)[hoy]
+        Tmod = C_temp_ann_arr[hoy_n]  # panelizer_object.get_cells_temp(surface, string, module)[hoy]
+        if np.sum(Gmod < module_parameters['minimum_irradiance_cell']) > 0:
+            Imod, Vmod = (np.zeros(303), np.zeros(303))
+        else:
+            if module_parameters['N_subcells'] > 1:
+                if module_parameters['orientation'] == 'portrait':
+                    Imod, Vmod = ipv_calc.calculate_module_curve_single_row(Gmod,
+                                                                            Tmod,
+                                                                            module_parameters,
+                                                                            module_dict['MAPS']['SUBMODULES'],
+                                                                            module_dict['MAPS']['DIODES'],
+                                                                            module_dict['MAPS']['SUBCELLS'])
                 else:
-                    # print("Nonstandard module")
-                    remap_results = ipv_mm.remap_module_maps(cell_type,
-                                                             module_parameters,
-                                                             default_diode_map,
-                                                             default_subcell_map)
-                    module_dict['MAPS']['SUBMODULES'] = remap_results[0]
-                    module_dict['MAPS']['DIODES'] = remap_results[1]
-                    module_dict['MAPS']['SUBCELLS'] = remap_results[2]
-                    module_parameters['N_s'] = remap_results[3]
-                    module_parameters['N_p'] = remap_results[4]
-                    module_parameters['N_diodes'] = remap_results[4]
-                    module_parameters['N_subcells'] = remap_results[6]
+                    Imod, Vmod = ipv_calc.calculate_module_curve_single_column(Gmod,
+                                                                               Tmod,
+                                                                               module_parameters,
+                                                                               module_dict['MAPS']['SUBMODULES'],
+                                                                               module_dict['MAPS']['DIODES'],
+                                                                               module_dict['MAPS']['SUBCELLS'])
 
-    if write_system==True:
-        print("Panelizer has completed writing input data into dict. File will now be saved.")
-        utils.write_pickle(panelizer_object,panelizer_object.system_file)
+            else:
+                Imod, Vmod = ipv_calc.calculate_module_curve_multiple_column(Gmod,
+                                                                             Tmod,
+                                                                             module_parameters,
+                                                                             module_dict['MAPS']['SUBMODULES'],
+                                                                             module_dict['MAPS']['DIODES'])
+
+        module_i_dict.update({hoy: np.round(Imod, 5)})
+        module_v_dict.update({hoy: np.round(Vmod, 5)})
+        module_g_dict.update({hoy: np.round(np.sum(Gmod * module_parameters['cell_area']), 1)})
+
+    return module_i_dict, module_v_dict, module_g_dict
+
+
+def compile_system_multi_core(module_dict_chunk, module_name_chunk, timeseries, tmy_location, dbt, psl,
+                              pv_cells_xyz_arr, grid_pts, direct_ill, diffuse_ill, base_parameters, custom_module_data,
+                              default_submodule_map, default_diode_map, default_subcell_map, cell_type):
+    module_results = {}
+
+    for n, module_dict in enumerate(module_dict_chunk):
+        module_name = module_name_chunk[n]
+        Imod, Vmod, Gmod = compile_system_single_core(module_dict, timeseries,
+                                                      tmy_location, dbt, psl,
+                                                      pv_cells_xyz_arr, grid_pts,
+                                                      direct_ill, diffuse_ill,
+                                                      base_parameters,
+                                                      custom_module_data,
+                                                      default_submodule_map,
+                                                      default_diode_map,
+                                                      default_subcell_map,
+                                                      cell_type)
+
+        module_results.update({module_name: [Imod, Vmod, Gmod]})
+
+    return module_results
+
+
+def build_module_features(module_dict, timeseries, tmy_location, dbt, psl, pv_cells_xyz_arr, grid_pts, direct_ill,
+                          diffuse_ill, base_parameters, custom_module_data, default_submodule_map, default_diode_map,
+                          default_subcell_map, cell_type):
+    # build parameters for module
+    # module_dict = panelizer_object.get_dict_instance([surface, string, module])
+    if len(pv_cells_xyz_arr.shape)>2:
+        pv_cells_xyz_arr = pv_cells_xyz_arr[0]
+
+    module_details = module_dict['DETAILS']
+
+    for k, v in custom_module_data.items():
+        base_parameters[k] = v
+
+    base_parameters['N_subcells'] = int(max(base_parameters['Nsubcell_col'], base_parameters['Nsubcell_row']))
+    for k, v in base_parameters.items():
+        if type(v) is str:
+            try:
+                base_parameters[k] = float(v)
+            except ValueError:
+                pass
+
+    base_parameters['n_cols'] = module_details['n_cols']
+    base_parameters['n_rows'] = module_details['n_rows']
+    base_parameters['total_cells'] = base_parameters['n_cols'] * base_parameters['n_rows']
+    # TODO recalculate parameters
+    # cell_area                                                 1.99
+    # Wp_m2_cell                                              161.01
+    # module_area                                                2.2
+    # Wp_m2_module # def deteect_subcells()
+    base_parameters['minimum_irradiance_cell'] = 5
+
+    # assign subcell counts if present
+    actual_cols = base_parameters['n_cols']
+    actual_rows = base_parameters['n_rows']
+    ideal_subcell_col = base_parameters['Nsubcell_col']
+    ideal_subcell_row = base_parameters['Nsubcell_row']
+    if ideal_subcell_col > ideal_subcell_row:
+        # print("Subcells detected for columns.")
+        base_parameters['Nsubcell_col'] = actual_cols
+        base_parameters['N_subcells'] = actual_cols
+    elif ideal_subcell_col < ideal_subcell_row:
+        # print("Subcells detected for rows.")
+        base_parameters['Nsubcell_row'] = actual_rows
+        base_parameters['N_subcells'] = actual_rows
     else:
-        print("Panelizer has completed writing input data into dict. File will not be saved. "
-              "Rerun with write_system to True to save or use 'utils.write_pickle(panelizer_ibject, panelizer_object.system_file)'")
+        pass
+
+    base_parameters['cell_area'] = (base_parameters['cell_area'] / (
+                base_parameters['n_rows_ideal'] * base_parameters['n_cols_ideal'])) * base_parameters['total_cells']
+    module_dict['PARAMETERS'] = base_parameters
+    module_parameters = module_dict['PARAMETERS']
+
+    # get direct and diffuse irradiance
+    # pv_cells_xyz_arr = np.array(panelizer_object.get_cells_xyz(surface, string, module))
+    sensor_pts_xyz_arr = grid_pts[['X', 'Y', 'Z']].values
+
+    G_dir_ann = ipv_irrad.collect_raw_irradiance(pv_cells_xyz_arr,
+                                                 sensor_pts_xyz_arr,
+                                                 direct_ill.T)#.values)
+    G_diff_ann = ipv_irrad.collect_raw_irradiance(pv_cells_xyz_arr,
+                                                  sensor_pts_xyz_arr,
+                                                  diffuse_ill.T)#.values)
+    # calculate effective irradiance
+    # tmy_location = utils.tmy_location(panelizer_object.tmy_file)
+    # dbt = panelizer_object.tmy_dataframe['drybulb_C'].values
+    # psl = panelizer_object.tmy_dataframe['atmos_Pa'].values
+
+    evaluated_normal_vector = tuple(module_dict['CELLSNORMALS'][0])
+    front_cover = module_dict['LAYERS']['front_film']
+
+    # calcualte the effectivate irradiance for the year
+    G_eff_ann = ipv_irrad.calculate_effective_irradiance_timeseries(G_dir_ann,
+                                                                    G_diff_ann,
+                                                                    evaluated_normal_vector,
+                                                                    timeseries,
+                                                                    tmy_location,
+                                                                    psl,
+                                                                    dbt,
+                                                                    front_cover)
+    # print(len(psl))
+    # print(len(dbt))
+    # print(G_dir_ann.shape)
+    # print(G_diff_ann.shape)
+    # print(G_eff_ann.shape)
+    # restructure the G_eff arrays following the general shape of the template (top right first)
+    ncols = module_parameters['n_cols']
+    nrows = module_parameters['n_rows']
+
+    hoy_arrs = []
+    for hoy_n in np.arange(0,len(timeseries)):
+        G_eff_hoy_arr = np.round(np.fliplr(G_eff_ann[:, hoy_n].reshape(-1, nrows)).T, 2)
+        hoy_arrs.append(G_eff_hoy_arr)
+
+    G_eff_ann = np.array(hoy_arrs)
+
+    # calculate cell temperature
+    C_temp_ann_arr = ipv_calc.calculate_cell_temperature(G_eff_ann,
+                                                         dbt[:, None, None],
+                                                         method="ross")
+
+    # set into dict
+    # module_dict['CELLSTEMP'] = C_temp_ann_arr
+    # module_dict['CELLSIRRADEFF'] = G_eff_ann
+
+    # set new _maps
+    # module_template = module_dict['DETAILS']['module_type']
+    # cell_type = ipv_mm.get_cell_type(module_template[0])
+    # orientation = ipv_mm.get_orientation(module_template[1])
+    # map_file = [fp for fp in map_files if f"{cell_type}_{orientation}" in fp][0]
+    # default_submodule_map, default_diode_map, default_subcell_map = utils.read_map_excel(map_file)
+
+    if ipv_mm.detect_nonstandard_module(module_dict) == 'standard':
+        print("Standard module")
+        module_dict['MAPS']['SUBMODULES'] = default_submodule_map
+        module_dict['MAPS']['DIODES'] = default_diode_map
+        module_dict['MAPS']['SUBCELLS'] = default_subcell_map
+    else:
+        print("Nonstandard module")
+        remap_results = ipv_mm.remap_module_maps(cell_type,
+                                                 module_parameters,
+                                                 default_diode_map,
+                                                 default_subcell_map)
+        module_dict['MAPS']['SUBMODULES'] = remap_results[0]
+        module_dict['MAPS']['DIODES'] = remap_results[1]
+        module_dict['MAPS']['SUBCELLS'] = remap_results[2]
+        module_parameters['N_s'] = remap_results[3]
+        module_parameters['N_p'] = remap_results[4]
+        module_parameters['N_diodes'] = remap_results[4]
+        module_parameters['N_subcells'] = remap_results[6]
+
+    return G_eff_ann, C_temp_ann_arr
