@@ -2,7 +2,7 @@ from pvlib import pvsystem, singlediode
 import numpy as np
 import multiprocess as mp
 
-from ipv_workbench.simulator import calculations
+from ipv_workbench.solver import calculations
 from ipv_workbench.utilities import circuits, utils, time_utils
 import time
 

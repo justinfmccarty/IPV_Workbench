@@ -171,7 +171,7 @@ def front_cover_loss(irradiance, color):
         light_grey    0.118
     :return: irradiance multiplied by the loss factor
     """
-    table_filepath = os.path.join(os.path.dirname(__file__), "../simulator/front_cover_loss_table.csv")
+    table_filepath = os.path.join(os.path.dirname(__file__), "../solver/front_cover_loss_table.csv")
     if os.path.exists(table_filepath):
         loss_table = pd.read_csv(table_filepath,index_col='Unnamed: 0')
     else:

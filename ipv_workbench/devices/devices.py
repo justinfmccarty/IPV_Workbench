@@ -1,6 +1,6 @@
 from ipv_workbench.utilities import utils
 import os
-from ipv_workbench.simulator import simulations as sim
+from ipv_workbench.solver import simulations as sim
 from ipv_workbench.visualize import plots as ipv_plots
 import numpy as np
 

@@ -3,7 +3,7 @@ import sys
 import os
 import random
 import numpy as np
-from ipv_workbench.simulator import calculations
+from ipv_workbench.solver import calculations
 from ipv_workbench.utilities import utils
 
 

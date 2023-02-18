@@ -1,6 +1,6 @@
 # ================================ Irradiance Corrections ================================
 # irradiance at cell
-from ipv_workbench.simulator import simulations_mp_archive, simulations
+from ipv_workbench.solver import simulations_mp_archive, simulations
 from ipv_workbench.utilities import circuits, utils
 import numpy as np
 

@@ -3,7 +3,7 @@ import numpy as np
 import multiprocess as mp
 from tqdm import notebook
 from ipv_workbench.translators import module_mapping as ipv_mm
-from ipv_workbench.simulator import calculations
+from ipv_workbench.solver import calculations
 from ipv_workbench.translators import panelizer
 from ipv_workbench.utilities import circuits, utils, time_utils
 import time

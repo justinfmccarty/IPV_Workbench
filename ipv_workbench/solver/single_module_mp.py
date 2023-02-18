@@ -3,7 +3,7 @@ import numpy as np
 import multiprocess as mp
 from tqdm import notebook
 from ipv_workbench.translators import module_mapping as ipv_mm
-from ipv_workbench.simulator import calculations
+from ipv_workbench.solver import calculations
 from ipv_workbench.translators import panelizer
 from ipv_workbench.utilities import circuits, utils, time_utils
 import time
@@ -16,7 +16,22 @@ def main(panelizer_object, string, module_dict, pv_cells_xyz_arr, tmy_location, 
          custom_module_data, default_submodule_map, default_diode_map, default_subcell_map, cell_type):
 
     ncpu = panelizer_object.ncpu
+
     timeseries_chunks = np.array_split(panelizer_object.all_hoy, ncpu)
+    if len(timeseries_chunks[0]) < 150:
+        print("Length of one timeseries chunk is below hard coded threshold of 150. "
+              "Switching to a single process.")
+        return compile_system_single_core(module_dict, timeseries,
+                                           tmy_location, dbt, psl,
+                                           pv_cells_xyz_arr, grid_pts,
+                                           direct_ill, diffuse_ill,
+                                           base_parameters,
+                                           custom_module_data,
+                                           default_submodule_map,
+                                           default_diode_map,
+                                           default_subcell_map,
+                                           cell_type)
+
     direct_ill_chunks = np.array_split(direct_ill, ncpu)
     diffuse_ill_chunks = np.array_split(diffuse_ill, ncpu)
     dbt_chunks = np.array_split(dbt, ncpu)

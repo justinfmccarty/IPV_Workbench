@@ -1,7 +1,7 @@
 from ipv_workbench.utilities import utils, circuits, time_utils
-from ipv_workbench.simulator import calculations as ipv_calc, compile_mp, single_module_mp
-from ipv_workbench.simulator import simulations
-from ipv_workbench.simulator import simulations_mp
+from ipv_workbench.solver import calculations as ipv_calc, compile_mp, single_module_mp, topology_solver
+from ipv_workbench.solver import simulations
+from ipv_workbench.solver import simulations_mp
 from ipv_workbench.translators import mapping_irradiance as ipv_irrad
 from ipv_workbench.translators import module_mapping as ipv_mm
 from tqdm import tqdm, notebook
@@ -212,18 +212,30 @@ class PanelizedObject:
         Imod, Vmod = circuits.calc_parallel(submodule_curves)
         return Imod, Vmod
 
-    def simulate_system_mp(self, surface):
-        if self.topology == 'central_inverter':
-            simulations_mp.simulation_central_inverter(
-                self, surface)
-        elif self.topology == 'string_inverter':
-            simulations_mp.simulation_string_inverter(
-                self, surface)
-        elif self.topology == 'micro_inverter':
-            simulations_mp.simulation_micro_inverter(
-                self, surface)
+    # def archive_solve_system_mp(self, surface):
+    #     if self.topology == 'central_inverter':
+    #         simulations_mp.simulation_central_inverter(
+    #             self, surface)
+    #     elif self.topology == 'string_inverter':
+    #         simulations_mp.simulation_string_inverter(
+    #             self, surface)
+    #     elif self.topology == 'micro_inverter':
+    #         simulations_mp.simulation_micro_inverter(
+    #             self, surface)
+    def transfer_initial(self):
+        for surface in self.get_surfaces():
+            for string in self.get_strings(surface):
+                for module in self.get_modules(surface,string):
+                    for topology in self.simulation_suite_topologies:
+                        module_dict = self.get_dict_instance(([surface,string,module]))
+                        Imod_init = module_dict['CURVES']["initial_simulation"]['Imod']
+                        Vmod_init = module_dict['CURVES']["initial_simulation"]['Vmod']
+                        Gmod_init = module_dict['YIELD']["initial_simulation"]['irrad']
+                        module_dict['CURVES'][topology]['Imod'] = Imod_init
+                        module_dict['CURVES'][topology]['Vmod'] = Vmod_init
+                        module_dict['YIELD'][topology]['irrad'] = Gmod_init
 
-    def simulate_system(self, surface, hoy):
+    def solve_system(self, surface, hoy):
         if self.topology == 'central_inverter':
             simulations.simulation_central_inverter(
                 self, surface, hoy)
@@ -242,47 +254,28 @@ class PanelizedObject:
         elif self.topology == 'micro_inverter':
             self.write_micro_inverter(surface, hoy)
 
-    def write_micro_inverter(self, surface, hoy):
+    def write_micro_inverter(self, surface, string):
 
-        for string in self.get_strings(surface):
+        for module in self.get_modules(surface, string):
+            module_dict = self.get_dict_instance([surface, string, module])
+            mpp_results_dict = topology_solver.solve_micro_inverter_mpp(self, module_dict)
 
-            for module in self.get_modules(surface, string):
-
-                Imod_hoy = self.get_dict_instance(
-                    [surface, string, module])['CURVES'][self.topology]['Imod'][hoy]
-                Vmod_hoy = self.get_dict_instance(
-                    [surface, string, module])['CURVES'][self.topology]['Vmod'][hoy]
-
-                simulation_results_string = simulations.calcMPP_IscVocFF(Imod_hoy,
-                                                                         Vmod_hoy)
-                temp_results_dict = utils.generate_empty_results_dict(
-                    target='STRING')
-                temp_results_dict.update(simulation_results_string)
-
-                Gmod_hoy = self.get_dict_instance([surface, string, module])['YIELD'][self.topology]['irrad'][hoy]
-                temp_results_dict.update({'irrad': Gmod_hoy})
-
-                module_input_energy = temp_results_dict['irrad']
-                if module_input_energy == 0:
-                    module_eff = 0
-                else:
-                    module_eff = np.round(temp_results_dict['pmp'] / module_input_energy, 3)
-
-                # write these results to the module dict
-                self.get_dict_instance([surface, string, module])[
-                    'YIELD'][self.topology]['imp'].update({hoy: temp_results_dict['imp']})
-                self.get_dict_instance([surface, string, module])[
-                    'YIELD'][self.topology]['vmp'].update({hoy: temp_results_dict['vmp']})
-                self.get_dict_instance([surface, string, module])[
-                    'YIELD'][self.topology]['pmp'].update({hoy: temp_results_dict['pmp']})
-                self.get_dict_instance([surface, string, module])[
-                    'YIELD'][self.topology]['isc'].update({hoy: temp_results_dict['isc']})
-                self.get_dict_instance([surface, string, module])[
-                    'YIELD'][self.topology]['voc'].update({hoy: temp_results_dict['voc']})
-                self.get_dict_instance([surface, string, module])[
-                    'YIELD'][self.topology]['ff'].update({hoy: temp_results_dict['ff']})
-                self.get_dict_instance([surface, string, module])[
-                    'YIELD'][self.topology]['eff'].update({hoy: module_eff})
+            # write these results to the module dict
+            for hoy in self.all_hoy:
+                module_dict[
+                    'YIELD'][self.topology]['imp'].update({hoy: mpp_results_dict[hoy]['imp']})
+                module_dict[
+                    'YIELD'][self.topology]['vmp'].update({hoy: mpp_results_dict[hoy]['vmp']})
+                module_dict[
+                    'YIELD'][self.topology]['pmp'].update({hoy: mpp_results_dict[hoy]['pmp']})
+                module_dict[
+                    'YIELD'][self.topology]['isc'].update({hoy: mpp_results_dict[hoy]['isc']})
+                module_dict[
+                    'YIELD'][self.topology]['voc'].update({hoy: mpp_results_dict[hoy]['voc']})
+                module_dict[
+                    'YIELD'][self.topology]['ff'].update({hoy: mpp_results_dict[hoy]['ff']})
+                module_dict[
+                    'YIELD'][self.topology]['eff'].update({hoy: mpp_results_dict[hoy]['module_eff']})
 
     def write_string_inverter(self, surface, hoy):
 
@@ -305,65 +298,76 @@ class PanelizedObject:
         # this loops through each "string" in the results
         for n in range(0, len(i_list)):
 
+            topology_solver.solve_string_inverter(i_list, v_list)
             # get the result keys from the string level
             string_result_keys = list(self.get_dict_instance([surface, strings[n]])[
                                           'YIELD'][self.topology].keys())
 
             # calculate mpp and related ->  [Imp, Vmp, Pmp, Isc, Voc, FF]
             # store in a temp directory
-            simulation_results_string = simulations.calcMPP_IscVocFF(np.array(i_list[n]),
-                                                                     np.array(v_list[n]))
-            temp_results_dict = utils.generate_empty_results_dict(
-                target='STRING')
-            temp_results_dict.update(simulation_results_string)
-            temp_results_dict.update({'irrad': g_list[n]})
 
-            # store everything in a dict
-            if g_list[n] == 0:
-                temp_results_dict.update({'eff': 0})
-            else:
-                efficiency = temp_results_dict['pmp'] / temp_results_dict['irrad']
-                temp_results_dict.update({'eff': efficiency})
+        for string in self.get_strings(surface):
+            string_dict = self.get_dict_instance([surface,string])
 
-            # iterate over the result keys and write then to the panelizer object
-            for key in string_result_keys:
-                # write to the panelizer object at the string level
-                self.get_dict_instance([surface, strings[n]])[
-                    'YIELD'][self.topology][key].update({hoy: np.round(temp_results_dict[key], 3)})
+            string_iv_results = topology_solver.solve_string_inverter_iv(self, surface, string)
 
-            # get the current at maximum power point to send to the module to calculate the power at MPP on the module
-            operating_imp = np.round(temp_results_dict['imp'], 3)
 
-            # loop through all modules in the string to calculate the power of the module using imp
-            # then write this and then calculat ethe efficiency using the svaed irrad
-            for module in self.get_modules(surface, strings[n]):
+            string_dict['CURVES'][self.topology]['Istr'] = string_iv_results[0]
+            string_dict['CURVES'][self.topology]['Vstr'] = string_iv_results[1]
+            string_dict['YIELD'][self.topology]['irrad'] = string_iv_results[2]
 
-                Imod_hoy = self.get_dict_instance(
-                    [surface, strings[n], module])['CURVES'][self.topology]['Imod'][hoy]
-                Vmod_hoy = self.get_dict_instance(
-                    [surface, strings[n], module])['CURVES'][self.topology]['Vmod'][hoy]
+            mpp_results_dict = topology_solver.solve_string_inverter_mpp(self, string_dict)
 
-                # interp the relationship between I and V for the hour o the module using the oeprating I
-                operating_vmp = np.round(np.interp(operating_imp, np.flipud(Imod_hoy),
-                                                   np.flipud(Vmod_hoy)), 5)
-                module_input_energy = self.get_dict_instance([surface, strings[n], module])[
-                    'YIELD'][self.topology]['irrad'][hoy]
-                module_mpp_power = np.round(operating_vmp * operating_imp, 3)
-                if module_input_energy == 0:
-                    module_eff = 0
-                else:
-                    module_eff = np.round(
-                        module_mpp_power / module_input_energy, 3)
+            for hoy in self.all_hoy:
+                string_dict[
+                    'YIELD'][self.topology]['imp'].update({hoy: mpp_results_dict[hoy]['imp']})
+                string_dict[
+                    'YIELD'][self.topology]['vmp'].update({hoy: mpp_results_dict[hoy]['vmp']})
+                string_dict[
+                    'YIELD'][self.topology]['pmp'].update({hoy: mpp_results_dict[hoy]['pmp']})
+                string_dict[
+                    'YIELD'][self.topology]['isc'].update({hoy: mpp_results_dict[hoy]['isc']})
+                string_dict[
+                    'YIELD'][self.topology]['voc'].update({hoy: mpp_results_dict[hoy]['voc']})
+                string_dict[
+                    'YIELD'][self.topology]['ff'].update({hoy: mpp_results_dict[hoy]['ff']})
+                string_dict[
+                    'YIELD'][self.topology]['eff'].update({hoy: mpp_results_dict[hoy]['module_eff']})
 
-                # write these results to the module dict
-                self.get_dict_instance([surface, strings[n], module])[
-                    'YIELD'][self.topology]['imp'].update({hoy: operating_imp})
-                self.get_dict_instance([surface, strings[n], module])[
-                    'YIELD'][self.topology]['vmp'].update({hoy: operating_vmp})
-                self.get_dict_instance([surface, strings[n], module])[
-                    'YIELD'][self.topology]['pmp'].update({hoy: module_mpp_power})
-                self.get_dict_instance([surface, strings[n], module])[
-                    'YIELD'][self.topology]['eff'].update({hoy: module_eff})
+
+                # get the current at maximum power point to send to the module to calculate the power at MPP on the module
+                operating_imp = np.round(string_dict['YIELD'][self.topology]['imp'][hoy], 3)
+
+                # loop through all modules in the string to calculate the power of the module using imp
+                # then write this and then calculat ethe efficiency using the svaed irrad
+                for module in self.get_modules(surface, string):
+                    module_dict = self.get_dict_instance([surface, string, module])
+
+                    Imod_hoy = module_dict['CURVES'][self.topology]['Imod'][hoy]
+                    Vmod_hoy = module_dict['CURVES'][self.topology]['Vmod'][hoy]
+
+                    # interp the relationship between I and V for the hour o the module using the oeprating I
+                    operating_vmp = np.round(np.interp(operating_imp, np.flipud(Imod_hoy),
+                                                       np.flipud(Vmod_hoy)), 5)
+
+                    module_input_energy = self.get_dict_instance([surface, string, module])[
+                        'YIELD'][self.topology]['irrad'][hoy]
+                    module_mpp_power = np.round(operating_vmp * operating_imp, 3)
+                    if module_input_energy == 0:
+                        module_eff = 0
+                    else:
+                        module_eff = np.round(
+                            module_mpp_power / module_input_energy, 3)
+
+                    # write these results to the module dict
+                    module_dict[
+                        'YIELD'][self.topology]['imp'].update({hoy: operating_imp})
+                    module_dict[
+                        'YIELD'][self.topology]['vmp'].update({hoy: operating_vmp})
+                    module_dict[
+                        'YIELD'][self.topology]['pmp'].update({hoy: module_mpp_power})
+                    module_dict[
+                        'YIELD'][self.topology]['eff'].update({hoy: module_eff})
 
     def write_central_inverter(self, surface, hoy):
         # po.get_dict_instance([surface])['RESULTSDICT']
@@ -589,8 +593,7 @@ class PanelizedObject:
             return results_df.loc[analysis_period]
 
 
-def compile_system(panelizer_object, write_system=False, mp=False):
-    # TODO parallelize the entire workflow
+def solve_object_module_iv(panelizer_object, write_system=False, mp=False):
 
     timeseries = panelizer_object.all_hoy
     tmy_location = utils.tmy_location(panelizer_object.tmy_file)
