@@ -226,13 +226,20 @@ class PanelizedObject:
     #         simulations_mp.simulation_micro_inverter(
     #             self, surface)
 
+    def print_system_names(self):
+        for surface in self.get_surfaces():
+            print(surface)
+            for string_ in self.get_strings(surface):
+                print("  ",string_)
+                for module in self.get_modules(surface, string_):
+                    print("    ",module)
 
     def transfer_initial(self):
-        for surface in self.get_surfaces():
-            for string in self.get_strings(surface):
-                for module in self.get_modules(surface,string):
+        for surface_ in self.get_surfaces():
+            for string_ in self.get_strings(surface_):
+                for module in self.get_modules(surface_,string_):
                     for topology in self.simulation_suite_topologies:
-                        module_dict = self.get_dict_instance(([surface,string,module]))
+                        module_dict = self.get_dict_instance(([surface_,string_,module]))
                         Imod_init = module_dict['CURVES']["initial_simulation"]['Imod']
                         Vmod_init = module_dict['CURVES']["initial_simulation"]['Vmod']
                         Gmod_init = module_dict['YIELD']["initial_simulation"]['irrad']
