@@ -4,33 +4,68 @@ from ipv_workbench.utilities import utils, time_utils, circuits
 
 import numpy as np
 
-def solve_central_inverter(panelizer_object, surface):
-    strings_i, strings_v, strings_g = simulation_string_inverter(panelizer_object, surface)
+
+def solve_central_inverter_iv(panelizer_object, surface):
+    strings = panelizer_object.get_strings(surface)
 
     surface_i = {}
     surface_v = {}
     surface_g = {}
 
     for hoy in panelizer_object.all_hoy:
-        strings_i_hoy = [strings_i[string][hoy] for string in panelizer_object.get_strings(surface)]
-        strings_v_hoy = [strings_v[string][hoy] for string in panelizer_object.get_strings(surface)]
-        strings_g_hoy = [strings_g[string][hoy] for string in panelizer_object.get_strings(surface)]
+        strings_i_hoy = [
+            panelizer_object.get_dict_instance([surface, string])['CURVES'][panelizer_object.topology][
+                'Istr'][
+                hoy] for string in strings]
+        strings_v_hoy = [
+            panelizer_object.get_dict_instance([surface, string])['CURVES'][panelizer_object.topology][
+                'Vstr'][
+                hoy] for string in strings]
+        strings_g_hoy = [
+            panelizer_object.get_dict_instance([surface, string])['YIELD'][panelizer_object.topology][
+                'irrad'][
+                hoy] for string in strings]
 
-        Isrf, Vsrf = circuits.calc_parallel(np.array([strings_i_hoy, strings_v_hoy]))
+        string_curves = np.array([strings_i_hoy, strings_v_hoy])
+
+        Isrf, Vsrf = circuits.calc_parallel(string_curves)
         Gsrf = np.sum(strings_g_hoy)
 
         surface_i.update({hoy: Isrf})
         surface_v.update({hoy: Vsrf})
         surface_g.update({hoy: Gsrf})
 
-        panelizer_object.get_dict_instance([surface])['CURVES'][panelizer_object.topology]['Isrf'].update(
-            {hoy: np.round([Isrf], 5)})
-        panelizer_object.get_dict_instance([surface])['CURVES'][panelizer_object.topology]['Vsrf'].update(
-            {hoy: np.round([Vsrf], 5)})
-        panelizer_object.get_dict_instance([surface])['YIELD'][panelizer_object.topology][
-            'irrad'].update({hoy: [np.round(Gsrf, 1)]})
-
     return surface_i, surface_v, surface_g
+
+def solve_central_inverter_mpp(panelizer_object, surface_dict):
+
+
+    temp_results_dict = {}
+    for hoy in panelizer_object.all_hoy:
+        Isrf_hoy = surface_dict['CURVES'][panelizer_object.topology]['Isrf'][hoy]
+        Vsrf_hoy = surface_dict['CURVES'][panelizer_object.topology]['Vsrf'][hoy]
+        Gsrf_hoy = surface_dict['YIELD'][panelizer_object.topology]['irrad'][hoy]
+
+        simulation_results_string_hoy = simulations.calcMPP_IscVocFF(Isrf_hoy,
+                                                                     Vsrf_hoy)
+
+        temp_results_dict_hoy = utils.generate_empty_results_dict(target='SURFACE')
+        temp_results_dict_hoy.update(simulation_results_string_hoy)
+        temp_results_dict_hoy.update({'irrad': Gsrf_hoy})
+
+        # store everything in a dict
+        if Gsrf_hoy == 0:
+            temp_results_dict_hoy.update({'eff': 0})
+        else:
+            efficiency = temp_results_dict_hoy['pmp'] / temp_results_dict_hoy['irrad']
+            temp_results_dict_hoy.update({'eff': efficiency})
+
+        for key in surface_dict['YIELD'][panelizer_object.topology].keys():
+            # write to the panelizer object at the string level
+            surface_dict['YIELD'][panelizer_object.topology][key].update(
+                {hoy: np.round(temp_results_dict_hoy[key], 3)})
+        temp_results_dict.update({hoy: temp_results_dict_hoy})
+    return temp_results_dict
 
 def solve_string_inverter_iv(panelizer_object, surface, string):
 
@@ -41,9 +76,9 @@ def solve_string_inverter_iv(panelizer_object, surface, string):
     #     modules_g = [module_results_dict[module][2] for module in panelizer_object.get_modules(surface, string)]
     modules = panelizer_object.get_modules(surface, string)
 
-    strings_i_hoy = {}
-    strings_v_hoy = {}
-    strings_g_hoy = {}
+    string_i = {}
+    string_v = {}
+    string_g = {}
 
     for hoy in panelizer_object.all_hoy:
 
@@ -75,11 +110,12 @@ def solve_string_inverter_iv(panelizer_object, surface, string):
                                           bypass=False)
         Gstr = np.sum(modules_g_hoy)
 
-        strings_i_hoy.update({hoy: Istr})
-        strings_v_hoy.update({hoy: Vstr})
-        strings_g_hoy.update({hoy: Gstr})
+        string_i.update({hoy: Istr})
+        string_v.update({hoy: Vstr})
+        string_g.update({hoy: Gstr})
 
-    return strings_i_hoy, strings_v_hoy, strings_g_hoy
+    return string_i, string_v, string_g
+
 
 def solve_string_inverter_mpp(panelizer_object, string_dict):
 
@@ -99,7 +135,7 @@ def solve_string_inverter_mpp(panelizer_object, string_dict):
         if Gstr_hoy == 0:
             temp_results_dict_hoy.update({'eff': 0})
         else:
-            efficiency = temp_results_dict_hoy['pmp'] / temp_results_dict['irrad']
+            efficiency = temp_results_dict_hoy['pmp'] / temp_results_dict_hoy['irrad']
             temp_results_dict_hoy.update({'eff': efficiency})
 
         # iterate over the result keys and write then to the panelizer object
@@ -115,7 +151,6 @@ def solve_string_inverter_mpp(panelizer_object, string_dict):
 
 
 def solve_micro_inverter_mpp(panelizer_object, module_dict):
-
     temp_results_dict = {}
     for hoy in panelizer_object.all_hoy:
         Imod_hoy = module_dict['CURVES'][panelizer_object.topology]['Imod'][hoy]
@@ -137,6 +172,6 @@ def solve_micro_inverter_mpp(panelizer_object, module_dict):
             module_eff = 0
         else:
             module_eff = np.round(temp_results_dict_hoy['pmp'] / module_input_energy, 3)
-        temp_results_dict_hoy.update({'module_eff': module_eff})
+        temp_results_dict_hoy.update({'eff': module_eff})
         temp_results_dict.update({hoy:temp_results_dict_hoy})
     return temp_results_dict

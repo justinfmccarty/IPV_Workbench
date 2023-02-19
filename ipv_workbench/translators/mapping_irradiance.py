@@ -42,13 +42,17 @@ def load_grid_file(bldg_radiance_dir, rad_surface_key):
 
 def collect_raw_irradiance(pv_cells_xyz_arr, sensor_pts_xyz_arr, sensor_pts_irradiance_arr):
     # TODO change this to use rectangular sampling based on cell dimensions
-
+    # print("PV Cells", pv_cells_xyz_arr.shape)
+    # print("Sensor XYZ", sensor_pts_xyz_arr.shape)
+    # print("Sensor irrad", sensor_pts_irradiance_arr.shape)
     cdist_arr = cdist(pv_cells_xyz_arr, sensor_pts_xyz_arr)
     first = cdist_arr.argsort()[:,0]
     second = cdist_arr.argsort()[:,1]
     third = cdist_arr.argsort()[:,2]
-    irrad_cell_mean = (sensor_pts_irradiance_arr[first] + sensor_pts_irradiance_arr[second] + sensor_pts_irradiance_arr[third]) / 3
-    return irrad_cell_mean
+    # print(cdist_arr[:, 0].shape)
+
+    irrad_cell_mean = (sensor_pts_irradiance_arr.T[first] + sensor_pts_irradiance_arr.T[second] + sensor_pts_irradiance_arr.T[third]) / 3
+    return irrad_cell_mean.T
 
 
 
@@ -267,7 +271,9 @@ def calculate_effective_irradiance_timeseries(G_dir, G_diff, evaluated_normal_ve
     solar_azimuth_deg = solar_position_hoy['azimuth'].values
 
     aoi_mod_deg = pvlib.irradiance.aoi(surface_tilt_deg, surface_azimuth_deg, solar_zenith_deg, solar_azimuth_deg)
-    aoi_mod_rad = np.deg2rad(aoi_mod_deg)
-    return calc_angular_loss_martin_ruiz(G_eff_dir, G_eff_diff, aoi_mod_rad, a_r=0.17)
+    # need to add an additional dimension for broadcasting against the irradiance arrays
+    aoi_mod_rad = np.deg2rad(aoi_mod_deg).reshape((aoi_mod_deg.shape[0],-1))
+    angular_loss = calc_angular_loss_martin_ruiz(G_eff_dir, G_eff_diff, aoi_mod_rad, a_r=0.17)
+    return angular_loss
 
 

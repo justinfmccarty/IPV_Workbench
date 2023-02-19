@@ -60,10 +60,14 @@ def main(panelizer_object, surface, string, tmy_location, dbt, psl, grid_pts, di
     modules = panelizer_object.get_modules(surface, string)
     module_dict_list = [panelizer_object.get_dict_instance([surface, string, module_name]) for module_name in modules]
     pv_cells_xyz_arr_list = [np.array(panelizer_object.get_cells_xyz(surface, string, module_name)) for module_name in modules]
+    pv_cells_xyz_arr_chunks = []
 
     module_dict_chunks = np.array_split(module_dict_list, ncpu)
     module_name_chunks = np.array_split(modules, ncpu)
-    pv_cells_xyz_arr_chunks = np.array_split(pv_cells_xyz_arr_list, ncpu)
+    pv_cells_xyz_arr_chunks = []
+    for module_name_chunk in module_name_chunks:
+        pv_cells_xyz_arr_chunks.append(
+            [panelizer_object.get_cells_xyz(surface, string, module_name) for module_name in module_name_chunk])
 
     string_dict = panelizer_object.get_dict_instance([surface, string])
     string_details = string_dict['DETAILS']
@@ -76,6 +80,7 @@ def main(panelizer_object, surface, string, tmy_location, dbt, psl, grid_pts, di
     orientation = ipv_mm.get_orientation(module_template[1])
     map_file = [fp for fp in panelizer_object.map_files if f"{cell_type}_{orientation}" in fp][0]
     default_submodule_map, default_diode_map, default_subcell_map = utils.read_map_excel(map_file)
+
 
     time_start = time.time()
 

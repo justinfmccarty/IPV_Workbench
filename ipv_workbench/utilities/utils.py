@@ -6,7 +6,7 @@ import pandas as pd
 from operator import itemgetter
 import os
 import pvlib
-
+import copy
 
 def directory_creator(dir_path):
     if os.path.exists(dir_path):
@@ -385,27 +385,27 @@ def unpack_mp_results(mp_results, panelizer_object, surface, string, modules, ti
         Gmod = module_results_dict[2]
 
         for hoy in timeseries:
-            if panelizer_object.simulation_suite == False:
-                module_dict['CURVES'][panelizer_object.topology][
-                    'Imod'].update({hoy: np.round(Imod[hoy], 5)})
-                module_dict['CURVES'][panelizer_object.topology][
-                    'Vmod'].update({hoy: np.round(Vmod[hoy], 5)})
-                module_dict['YIELD'][panelizer_object.topology][
-                    'irrad'].update({hoy: np.round(Gmod[hoy], 1)})
-            else:
-                module_dict['CURVES']["initial_simulation"][
-                    'Imod'].update({hoy: np.round(Imod[hoy], 5)})
-                module_dict['CURVES']["initial_simulation"][
-                    'Vmod'].update({hoy: np.round(Vmod[hoy], 5)})
-                module_dict['YIELD']["initial_simulation"][
-                    'irrad'].update({hoy: np.round(Gmod[hoy], 1)})
+            # if panelizer_object.simulation_suite == False:
+            #     module_dict['CURVES'][panelizer_object.topology][
+            #         'Imod'].update({hoy: np.round(Imod[hoy], 5)})
+            #     module_dict['CURVES'][panelizer_object.topology][
+            #         'Vmod'].update({hoy: np.round(Vmod[hoy], 5)})
+            #     module_dict['YIELD'][panelizer_object.topology][
+            #         'irrad'].update({hoy: np.round(Gmod[hoy], 1)})
+            # else:
+            module_dict['CURVES']["initial_simulation"][
+                'Imod'].update({hoy: np.round(Imod[hoy], 5)})
+            module_dict['CURVES']["initial_simulation"][
+                'Vmod'].update({hoy: np.round(Vmod[hoy], 5)})
+            module_dict['YIELD']["initial_simulation"][
+                'irrad'].update({hoy: np.round(Gmod[hoy], 1)})
 
-        if panelizer_object.simulation_suite == True:
-            for topology in panelizer_object.simulation_suite_topologies:
-                module_dict['CURVES'][topology] = \
-                    copy.deepcopy(
-                        module_dict['CURVES']['initial_simulation'])
-                module_dict['YIELD'][topology] = \
-                    copy.deepcopy(
-                        module_dict['YIELD']['initial_simulation'])
+        # if panelizer_object.simulation_suite == True:
+        # for topology in panelizer_object.simulation_suite_topologies:
+        #     module_dict['CURVES'][topology] = \
+        #         copy.deepcopy(
+        #             module_dict['CURVES']['initial_simulation'])
+        #     module_dict['YIELD'][topology] = \
+        #         copy.deepcopy(
+        #             module_dict['YIELD']['initial_simulation'])
 

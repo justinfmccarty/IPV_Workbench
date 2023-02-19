@@ -6,22 +6,19 @@ import numpy as np
 
 
 class Cell:
-    def __init__(self, parameter_file):
-        self.parameter_file = parameter_file
-        self.parameters_dict = utils.read_parameter_file(self.parameter_file)
+    def __init__(self, parameter_dict):
+        self.parameters_dict = parameter_dict
         self.assign_parameters()
         self.iv_library = None
         self.iv_library_conditions = None
         self.iv_library_resolution = None
         self.vectorized_retrieve_curve = np.vectorize(self.retrieve_curve, excluded='self')
 
-
-
     def assign_parameters(self):
         # TODO map datatypes to value assignment
         for k, v in self.parameters_dict.items():
             setattr(self, k, v)
-        self.cell_area = self.width * self.height
+        self.cell_area = self.cell_width * self.cell_height
 
     def assign_iv_library(self, profile_path, write_library=True):
         conditions = utils.create_conditions_map()
