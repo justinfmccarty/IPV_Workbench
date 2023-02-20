@@ -1,3 +1,6 @@
+import lzma
+import sys
+
 import numpy as np
 import gzip
 import json
@@ -174,9 +177,14 @@ def read_pickle(file_path, read_method='rb'):
         cucumber = pickle.load(fp)
     return cucumber
 
-def write_pickle(cucumber, file_path, write_method="wb"):
-    with open(file_path, write_method) as fp:
-        pickle.dump(cucumber, fp, protocol=pickle.HIGHEST_PROTOCOL)
+def write_pickle(cucumber, file_path, write_method="wb", compress=False):
+
+    if compress==False:
+        with open(file_path, write_method) as fp:
+            pickle.dump(cucumber, fp, protocol=pickle.HIGHEST_PROTOCOL)
+    else:
+        with lzma.open(file_path, write_method) as fp:
+            pickle.dump(cucumber, fp)
     return file_path
 
 
@@ -373,7 +381,7 @@ def get_cec_data(cec_key=None, file_path=None):
 def unpack_mp_results(mp_results, panelizer_object, surface, string, modules, timeseries):
 
     results_dict = {}
-    for r in mp_results:
+    for r in mp_results: # size is based on n_cpu (just reorganizing from the pool)
         results_dict.update(r)
 
     for module in modules:
@@ -384,6 +392,7 @@ def unpack_mp_results(mp_results, panelizer_object, surface, string, modules, ti
         Vmod = module_results_dict[1]
         Gmod = module_results_dict[2]
 
+        module_dict.update({'PARAMETERS':module_results_dict[3]})
         for hoy in timeseries:
             # if panelizer_object.simulation_suite == False:
             #     module_dict['CURVES'][panelizer_object.topology][
@@ -408,4 +417,37 @@ def unpack_mp_results(mp_results, panelizer_object, surface, string, modules, ti
         #     module_dict['YIELD'][topology] = \
         #         copy.deepcopy(
         #             module_dict['YIELD']['initial_simulation'])
+
+def clean_grasshopper_key(key):
+    return key.replace("{","").replace("}","").replace(";","_")
+
+def calc_self_sufficiency_consumption(demand,generation):
+    net_demand = demand - generation
+    net_demand_clipped = np.where(net_demand<0,0,net_demand)
+    pv_consumed = demand - net_demand_clipped
+
+    self_sufficiency = 100 * (pv_consumed / demand)
+    #preinit the array in case generation is zero (np.where does not work with division 0)
+    self_consumption = 100 * np.divide(pv_consumed,generation, out=np.zeros_like(pv_consumed), where=generation!=0)
+    return self_sufficiency, self_consumption
+
+def get_size(obj, seen=None):
+    """Recursively finds size of objects"""
+    size = sys.getsizeof(obj)
+    if seen is None:
+        seen = set()
+    obj_id = id(obj)
+    if obj_id in seen:
+        return 0
+    # Important mark as seen *before* entering recursion to gracefully handle
+    # self-referential objects
+    seen.add(obj_id)
+    if isinstance(obj, dict):
+        size += sum([get_size(v, seen) for v in obj.values()])
+        size += sum([get_size(k, seen) for k in obj.keys()])
+    elif hasattr(obj, '__dict__'):
+        size += get_size(obj.__dict__, seen)
+    elif hasattr(obj, '__iter__') and not isinstance(obj, (str, bytes, bytearray)):
+        size += sum([get_size(i, seen) for i in obj])
+    return size
 

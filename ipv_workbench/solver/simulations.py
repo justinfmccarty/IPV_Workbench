@@ -228,12 +228,12 @@ def calcMPP_IscVocFF(Isys, Vsys):
                 # calculate max power at Pv = 0
                 Pmp = Imp * Vmp
                 # calculate Voc, current must be increasing so flipup()
-                Voc = np.interp(np.float64(0), np.flipud(Isys),
-                                np.flipud(Vsys))
-                Isc = np.interp(np.float64(0), Vsys, Isys)  # calculate Isc
-                FF = Pmp / Isc / Voc
+                # Voc = np.interp(np.float64(0), np.flipud(Isys),
+                #                 np.flipud(Vsys))
+                # Isc = np.interp(np.float64(0), Vsys, Isys)  # calculate Isc
+                # FF = Pmp / Isc / Voc
 
-    return dict(zip(['imp', 'vmp', 'pmp', 'isc', 'voc', 'ff'], [Imp, Vmp, Pmp, Isc, Voc, FF]))
+    return dict(zip(['imp', 'vmp', 'pmp'], [Imp, Vmp, Pmp]))
 
 
 def simulation_central_inverter(panelizer_object, surface, hoy):

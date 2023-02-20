@@ -1,6 +1,6 @@
 from pvlib import pvsystem, singlediode
 import numpy as np
-import multiprocess as mp
+import multiprocessing as mp
 from tqdm import notebook
 from ipv_workbench.translators import module_mapping as ipv_mm
 from ipv_workbench.solver import calculations
@@ -37,12 +37,9 @@ def main(panelizer_object, string, module_dict, pv_cells_xyz_arr, tmy_location, 
     dbt_chunks = np.array_split(dbt, ncpu)
     psl_chunks = np.array_split(psl, ncpu)
 
-    time_start = time.time()
-
     with mp.Pool(processes=ncpu) as pool:
         # print("    Pool Opened")
-        print("    -----------")
-        time.sleep(.05)
+
         args = list(zip([module_dict] * ncpu,
                         timeseries_chunks,
                         [tmy_location] * ncpu,
@@ -61,7 +58,7 @@ def main(panelizer_object, string, module_dict, pv_cells_xyz_arr, tmy_location, 
         # module_dict, surface, string, module, cell_area, cell_params, hoy_chunk
         mp_results = pool.starmap(panelizer.compile_system_single_core, args)
         # print("    Result Gathered")
-        # time.sleep(1)
+        time.sleep(0.5)
         pool.close()
         # print("    Pool closed")
         pool.join()
@@ -74,19 +71,20 @@ def main(panelizer_object, string, module_dict, pv_cells_xyz_arr, tmy_location, 
     # for r in mp_results:
     #     r[0]
 
-    time_end = time.time()
-    print(f"Time elapsed for string {string}: {round(time_end - time_start, 2)}s")
 
     module_i_dict = {}
     module_v_dict = {}
     module_g_dict = {}
+    module_param_dict = []
 
     for r_ in mp_results:
         module_i_dict.update(r_[0])
         module_v_dict.update(r_[1])
         module_g_dict.update(r_[2])
+        module_param_dict.append(r_[3])
 
-    return module_i_dict, module_v_dict, module_g_dict
+
+    return module_i_dict, module_v_dict, module_g_dict, module_param_dict
 
 if __name__=="__main__":
     main(panelizer_object, string, module_dict, pv_cells_xyz_arr, tmy_location, dbt, psl, grid_pts, direct_ill, diffuse_ill, base_parameters,

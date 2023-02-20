@@ -71,8 +71,8 @@ def main(panelizer_object, surface, string, tmy_location, dbt, psl, grid_pts, di
 
     string_dict = panelizer_object.get_dict_instance([surface, string])
     string_details = string_dict['DETAILS']
-    base_parameters = utils.get_cec_data(string_details['cec_key'], file_path=panelizer_object.CEC_DATA)
-    custom_module_data = pd.read_csv(panelizer_object.MODULE_CELL_DATA, index_col='scenario').loc[
+    base_parameters = utils.get_cec_data(string_details['cec_key'], file_path=panelizer_object.cec_data)
+    custom_module_data = pd.read_csv(panelizer_object.module_cell_data, index_col='scenario').loc[
         string_details['module_type']].to_dict()
 
     module_template = string_dict['DETAILS']['module_type']
@@ -82,12 +82,10 @@ def main(panelizer_object, surface, string, tmy_location, dbt, psl, grid_pts, di
     default_submodule_map, default_diode_map, default_subcell_map = utils.read_map_excel(map_file)
 
 
-    time_start = time.time()
 
     with mp.Pool(processes=ncpu) as pool:
         # print("    Pool Opened")
-        print("    -----------")
-        time.sleep(.05)
+
         args = list(zip(module_dict_chunks,
                         module_name_chunks,
                         [timeseries] * ncpu,
@@ -114,8 +112,7 @@ def main(panelizer_object, surface, string, tmy_location, dbt, psl, grid_pts, di
         pool.join()
         # print("    Pool joined")
     utils.unpack_mp_results(mp_results, panelizer_object, surface, string, modules, timeseries)
-    time_end = time.time()
-    print(f"Time elapsed for string {string}: {round(time_end - time_start, 2)}s")
+
 
 
 if __name__=="__main__":
