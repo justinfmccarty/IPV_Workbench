@@ -255,6 +255,7 @@ def calculate_effective_irradiance_timeseries(G_dir, G_diff, evaluated_normal_ve
     # part 2: angle of incidence mod
     # TODO modifiy vector calcs to take an array and return an array in case of non-planar module
     surface_azimuth, surface_tilt = vector_to_tilt_and_azimuth(evaluated_normal_vector)
+    # print(pressure.shape, time_utils.hoy_to_date(hoy).shape)
 
     solar_position_hoy = pvlib.solarposition.get_solarposition(time_utils.hoy_to_date(hoy),
                                                                tmy_location['lat'],

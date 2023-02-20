@@ -394,29 +394,11 @@ def unpack_mp_results(mp_results, panelizer_object, surface, string, modules, ti
 
         module_dict.update({'PARAMETERS':module_results_dict[3]})
         for hoy in timeseries:
-            # if panelizer_object.simulation_suite == False:
-            #     module_dict['CURVES'][panelizer_object.topology][
-            #         'Imod'].update({hoy: np.round(Imod[hoy], 5)})
-            #     module_dict['CURVES'][panelizer_object.topology][
-            #         'Vmod'].update({hoy: np.round(Vmod[hoy], 5)})
-            #     module_dict['YIELD'][panelizer_object.topology][
-            #         'irrad'].update({hoy: np.round(Gmod[hoy], 1)})
-            # else:
-            module_dict['CURVES']["initial_simulation"][
-                'Imod'].update({hoy: np.round(Imod[hoy], 5)})
-            module_dict['CURVES']["initial_simulation"][
-                'Vmod'].update({hoy: np.round(Vmod[hoy], 5)})
-            module_dict['YIELD']["initial_simulation"][
-                'irrad'].update({hoy: np.round(Gmod[hoy], 1)})
 
-        # if panelizer_object.simulation_suite == True:
-        # for topology in panelizer_object.simulation_suite_topologies:
-        #     module_dict['CURVES'][topology] = \
-        #         copy.deepcopy(
-        #             module_dict['CURVES']['initial_simulation'])
-        #     module_dict['YIELD'][topology] = \
-        #         copy.deepcopy(
-        #             module_dict['YIELD']['initial_simulation'])
+            module_dict['CURVES']['Imod'].update({hoy: np.round(Imod[hoy], 5)})
+            module_dict['CURVES']['Vmod'].update({hoy: np.round(Vmod[hoy], 5)})
+            module_dict['YIELD']["initial_simulation"]['irrad'].update({hoy: np.round(Gmod[hoy], 1)})
+
 
 def clean_grasshopper_key(key):
     return key.replace("{","").replace("}","").replace(";","_")
@@ -451,3 +433,7 @@ def get_size(obj, seen=None):
         size += sum([get_size(i, seen) for i in obj])
     return size
 
+def log_run(file_path, write_string):
+    #file_path = os.path.join(folder,"runtime.txt")
+    with open(file_path, "a") as fp:
+        fp.write(write_string)

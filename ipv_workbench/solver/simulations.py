@@ -217,7 +217,8 @@ def calcMPP_IscVocFF(Isys, Vsys):
             if any(dP) == 0 or any(dV) == 0:
                 Imp, Vmp, Pmp, Isc, Voc, FF = 0, 0, 0, 0, 0, 0
             else:
-                Pv = dP / dV  # size is (2, 1)
+                # Pv = dP / dV  # size is (2, 1)
+                Pv = np.divide(dP, dV, out=np.zeros_like(dP), where=dV!=0)
                 # dP/dV is central difference at midpoints,
                 Vmid = (V[1:] + V[:-1]) / 2.0  # size is (2, 1)
                 Imid = (I[1:] + I[:-1]) / 2.0  # size is (2, 1)
@@ -242,12 +243,10 @@ def simulation_central_inverter(panelizer_object, surface, hoy):
     Isrf, Vsrf = circuits.calc_parallel(np.array([strings_i, strings_v]))
     Gsrf = np.sum(strings_g)
 
-    panelizer_object.get_dict_instance([surface])['YIELD'][panelizer_object.topology][
-        'irrad'].update({hoy: [np.round(Gsrf, 1)]})
-    panelizer_object.get_dict_instance([surface])['CURVES'][panelizer_object.topology]['Isrf'].update(
-        {hoy: np.round([Isrf], 3)})
-    panelizer_object.get_dict_instance([surface])['CURVES'][panelizer_object.topology]['Vsrf'].update(
-        {hoy: np.round([Vsrf], 3)})
+    panelizer_object.get_dict_instance([surface])['YIELD'][panelizer_object.topology]['irrad'].update(
+        {hoy: [np.round(Gsrf, 1)]})
+    panelizer_object.get_dict_instance([surface])['CURVES']['Isrf'].update({hoy: np.round([Isrf], 3)})
+    panelizer_object.get_dict_instance([surface])['CURVES']['Vsrf'].update({hoy: np.round([Vsrf], 3)})
 
     return [Isrf], [Vsrf], [Gsrf]
 
@@ -269,12 +268,10 @@ def simulation_string_inverter(panelizer_object, surface, hoy):
         strings_v.append(Vstr)
         strings_g.append(Gstr)
 
-        panelizer_object.get_dict_instance([surface, string])['CURVES'][panelizer_object.topology]['Istr'].update(
-            {hoy: np.round(Istr, 5)})
-        panelizer_object.get_dict_instance([surface, string])['CURVES'][panelizer_object.topology]['Vstr'].update(
-            {hoy: np.round(Vstr, 5)})
-        panelizer_object.get_dict_instance([surface, string])['YIELD'][panelizer_object.topology][
-            'irrad'].update({hoy: np.round(Gstr, 1)})
+        panelizer_object.get_dict_instance([surface, string])['YIELD'][panelizer_object.topology]['irrad'].update(
+            {hoy: np.round(Gstr, 1)})
+        panelizer_object.get_dict_instance([surface, string])['CURVES']['Istr'].update({hoy: np.round(Istr, 5)})
+        panelizer_object.get_dict_instance([surface, string])['CURVES']['Vstr'].update({hoy: np.round(Vstr, 5)})
 
     return strings_i, strings_v, strings_g
 
@@ -305,10 +302,8 @@ def loop_module_simulation(panelizer_object, surface, string, hoy):
 
         panelizer_object.get_dict_instance([surface, string, module])['YIELD'][panelizer_object.topology][
             'irrad'].update({hoy: np.round(Gmod, 1)})
-        panelizer_object.get_dict_instance([surface, string, module])['CURVES'][panelizer_object.topology][
-            'Imod'].update({hoy: np.round(Imod, 3)})
-        panelizer_object.get_dict_instance([surface, string, module])['CURVES'][panelizer_object.topology][
-            'Vmod'].update({hoy: np.round(Vmod, 3)})
+        panelizer_object.get_dict_instance([surface, string, module])['CURVES']['Imod'].update({hoy: np.round(Imod, 3)})
+        panelizer_object.get_dict_instance([surface, string, module])['CURVES']['Vmod'].update({hoy: np.round(Vmod, 3)})
 
     return modules_i, modules_v, modules_g
 

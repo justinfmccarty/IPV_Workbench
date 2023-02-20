@@ -19,19 +19,21 @@ def main(panelizer_object, string, module_dict, pv_cells_xyz_arr, tmy_location, 
 
     timeseries_chunks = np.array_split(panelizer_object.all_hoy, ncpu)
     if len(timeseries_chunks[0]) < 150:
-        print("Length of one timeseries chunk is below hard coded threshold of 150. "
-              "Switching to a single process.")
-        return panelizer.compile_system_single_core(module_dict, panelizer_object.all_hoy,
-                                                   tmy_location, dbt, psl,
-                                                   pv_cells_xyz_arr, grid_pts,
-                                                   direct_ill, diffuse_ill,
-                                                   base_parameters,
-                                                   custom_module_data,
-                                                   default_submodule_map,
-                                                   default_diode_map,
-                                                   default_subcell_map,
-                                                   cell_type)
-
+        ncpu = 4
+        timeseries_chunks = np.array_split(panelizer_object.all_hoy, ncpu)
+        # this fix is brokedn due to the output of the function not agreegin with the expected output from the MP function
+        # print("Length of one timeseries chunk is below hard coded threshold of 150. "
+        #       "Switching to a single process.")
+        # return panelizer.compile_system_single_core(module_dict, panelizer_object.all_hoy,
+        #                                            tmy_location, dbt, psl,
+        #                                            pv_cells_xyz_arr, grid_pts,
+        #                                            direct_ill, diffuse_ill,
+        #                                            base_parameters,
+        #                                            custom_module_data,
+        #                                            default_submodule_map,
+        #                                            default_diode_map,
+        #                                            default_subcell_map,
+        #                                            cell_type)
     direct_ill_chunks = np.array_split(direct_ill, ncpu)
     diffuse_ill_chunks = np.array_split(diffuse_ill, ncpu)
     dbt_chunks = np.array_split(dbt, ncpu)

@@ -7,7 +7,6 @@ from ipv_workbench.solver import simulations
 from ipv_workbench.solver import simulations_mp
 from ipv_workbench.translators import mapping_irradiance as ipv_irrad
 from ipv_workbench.translators import module_mapping as ipv_mm
-from tqdm import tqdm, notebook
 import os
 import numpy as np
 import pandas as pd
@@ -16,43 +15,56 @@ import glob
 
 
 class PanelizedObject:
-    def __init__(self, panelizer_input):
-        if type(panelizer_input) is dict:
-            self.input_type = 'dict'
-            self.panelizer_file = None
-            self.panelizer_dict = panelizer_input
-        elif type(panelizer_input) is str:
-            if os.path.exists(panelizer_input):
-                self.input_type = 'file'
-                self.panelizer_file = panelizer_input
-                self.file_name = self.panelizer_file.split(os.sep)[-1].split(".")[0]
-                self.panelizer_dict = utils.read_pickle(panelizer_input)
-            else:
-                print("Input detected as string but file path does not exist.")
+    def __init__(self, project_folder, object_name, raw_panelizer):
 
-        self.object_type = list(self.panelizer_dict.keys())[0]
-        self.object_surfaces = list(self.panelizer_dict[self.object_type]['SURFACES'].keys())
-        if self.object_type == 'BUILDING':
-            self.object_name = f"B{self.panelizer_dict[self.object_type]['NAME']}"
-        else:
-            self.object_name = f"O{self.panelizer_dict[self.object_type]['NAME']}"
+        self.object_name = object_name
+        self.raw_panelizer = raw_panelizer
+        self.project_folder = project_folder
+        self.project_setup()
+
         self.cell = None
         self.module = None
         self.topology = None
         self.tmy_dataframe = None
         self.analyis_period = (None, None, None)  # start, end, increment
         self.all_hoy = None
-        self.ncpu = mp.cpu_count() - 2
+        self.ncpu = mp.cpu_count() - 1
         self.multiprocess = True
         self.simulation_suite = False
         self.simulation_suite_topologies = ['micro_inverter', 'string_inverter', 'central_inverter']
         self.analysis_location = None
         self.analysis_year = None
 
-    def project_setup(self, project_folder):
-        self.PROJECT_DIR = project_folder
+    def project_setup(self):
+        self.PROJECT_DIR = self.project_folder
+
+        # object data
+        self.OBJECTS_DIR = os.path.join(self.PROJECT_DIR, "objects")
+        utils.directory_creator(self.OBJECTS_DIR)
+        self.OBJECT_DIR = os.path.join(self.OBJECTS_DIR, self.object_name)
+        utils.directory_creator(self.OBJECT_DIR)
+        self.PANELIZER_DIR = os.path.join(self.OBJECT_DIR, "panelizer")
+        utils.directory_creator(self.PANELIZER_DIR)
+
+        self.set_panelizer_dict()
+
+        self.CUMULATIVE_RESULTS_DIR = os.path.join(self.OBJECTS_DIR, "cumulative_results")
+        utils.directory_creator(self.CUMULATIVE_RESULTS_DIR)
+        self.CUMULATIVE_RESULTS_DENSE_DIR = os.path.join(self.OBJECTS_DIR, "cumulative_condensed")
+        utils.directory_creator(self.CUMULATIVE_RESULTS_DENSE_DIR)
+
+        self.COLD_DIR = os.path.join(self.OBJECT_DIR, "cold_storage")
+        utils.directory_creator(self.COLD_DIR)
+        self.RESULTS_DIR = os.path.join(self.OBJECT_DIR, "results")
+        utils.directory_creator(self.RESULTS_DIR)
+        self.ANNUAL_RESULT_DIR = os.path.join(self.RESULTS_DIR, "annual")
+        utils.directory_creator(self.ANNUAL_RESULT_DIR)
+        self.TIMESERIES_RESULT_DIR = os.path.join(self.RESULTS_DIR, "timeseries")
+        utils.directory_creator(self.TIMESERIES_RESULT_DIR)
+
+
         # shared data betweens cenarios, objects
-        self.SHARED_DIR = os.path.join(project_folder,"shared")
+        self.SHARED_DIR = os.path.join(self.PROJECT_DIR,"shared")
         utils.directory_creator(self.SHARED_DIR)
 
         self.RADIANCE_DIRS = os.path.join(self.SHARED_DIR, "radiance_models")
@@ -73,35 +85,39 @@ class PanelizedObject:
         self.LOADS_DIR = os.path.join(self.RESOURCES_DIR, "loads")
         utils.directory_creator(self.LOADS_DIR)
 
+    def set_panelizer_dict(self):
+        # print("Setting dict from raw panelizer file")
+        if type(self.raw_panelizer) is dict:
+            self.input_type = 'dict'
+            self.panelizer_file = None
+            self.panelizer_dict = self.raw_panelizer
+        else:
+            object_path = os.path.join(self.OBJECT_DIR, "panelizer", self.raw_panelizer)
+            # print(object_path)
+            if os.path.exists(object_path):
+                self.input_type = 'file'
+                self.panelizer_file = object_path
+                self.file_name = self.panelizer_file.split(os.sep)[-1].split(".")[0]
+                self.panelizer_dict = utils.read_pickle(object_path)
+            else:
+                print(object_path)
+                print("Input detected as string but file path does not exist.")
+
+        self.object_type = list(self.panelizer_dict.keys())[0]
+        self.object_surfaces = list(self.panelizer_dict[self.object_type]['SURFACES'].keys())
+
+        # print(self.object_type)
+        # if self.object_type == 'BUILDING':
+        #     self.object_name = f"B{self.panelizer_dict[self.object_type]['NAME']}"
+        # else:
+        #     self.object_name = f"O{self.panelizer_dict[self.object_type]['NAME']}"
+
+    def set_tmy_data(self):
         self.TMY_DIR = os.path.join(self.RESOURCES_DIR, 'tmy')
         utils.directory_creator(self.TMY_DIR)
-
         self.wea_file = os.path.join(self.TMY_DIR, f"{self.analysis_location}_{self.analysis_year}.wea")
         self.tmy_file = os.path.join(self.TMY_DIR, f"{self.analysis_location}_{self.analysis_year}.epw")
         self.tmy_dataframe = utils.tmy_to_dataframe(self.tmy_file)
-
-
-        self.OBJECTS_DIR = os.path.join(project_folder,"objects")
-        utils.directory_creator(self.OBJECTS_DIR)
-        self.OBJECT_DIR = os.path.join(self.OBJECTS_DIR, self.object_name)
-        utils.directory_creator(self.OBJECT_DIR)
-        self.PANELIZER_DIR = os.path.join(self.OBJECT_DIR, "panelizer")
-        utils.directory_creator(self.PANELIZER_DIR)
-
-
-        self.COLD_DIR = os.path.join(self.OBJECT_DIR, "cold_storage")
-        utils.directory_creator(self.COLD_DIR)
-        self.RESULTS_DIR = os.path.join(self.OBJECT_DIR, "results")
-        utils.directory_creator(self.RESULTS_DIR)
-        self.ANNUAL_RESULT_DIR = os.path.join(self.RESULTS_DIR, "annual")
-        utils.directory_creator(self.ANNUAL_RESULT_DIR)
-        self.TIMESERIES_RESULT_DIR = os.path.join(self.RESULTS_DIR, "timeseries")
-        utils.directory_creator(self.TIMESERIES_RESULT_DIR)
-
-
-
-
-
 
 
 
@@ -121,7 +137,7 @@ class PanelizedObject:
     def set_analysis_period(self, start, end, increment):
         self.analyis_period = (start, end, increment)
         self.all_hoy = np.arange(self.analyis_period[0], self.analyis_period[1], self.analyis_period[2])
-
+        return self.all_hoy
     # def reset_results_dict(self, surface):
     #     self.get_dict_instance([surface])['RESULTSDICT'] = {}
     #
@@ -263,12 +279,11 @@ class PanelizedObject:
                 for module in self.get_modules(surface_,string_):
                     for topology in self.simulation_suite_topologies:
                         module_dict = self.get_dict_instance(([surface_,string_,module]))
-                        Imod_init = module_dict['CURVES']["initial_simulation"]['Imod']
-                        Vmod_init = module_dict['CURVES']["initial_simulation"]['Vmod']
-                        Gmod_init = module_dict['YIELD']["initial_simulation"]['irrad']
-                        module_dict['CURVES'][topology]['Imod'] = copy.deepcopy(Imod_init)
-                        module_dict['CURVES'][topology]['Vmod'] = copy.deepcopy(Vmod_init)
-                        module_dict['YIELD'][topology]['irrad'] = copy.deepcopy(Gmod_init)
+                        # Imod_init = module_dict['CURVES']['Imod']
+                        # Vmod_init = module_dict['CURVES']['Vmod']
+                        # module_dict['CURVES'][topology]['Imod'] = copy.deepcopy(Imod_init)
+                        # module_dict['CURVES'][topology]['Vmod'] = copy.deepcopy(Vmod_init)
+                        module_dict['YIELD'][topology]['irrad'] = module_dict['YIELD']["initial_simulation"]['irrad']
 
                         # for k in ['actual_module_area_m2', 'actual_capacity_Wp']:
                         #     module_dict['YIELD'][topology][k] = module_dict['PARAMETERS'][k]
@@ -366,13 +381,13 @@ class PanelizedObject:
             string_iv_results = topology_solver.solve_string_inverter_iv(self, surface, string)
 
 
-            string_dict['CURVES'][self.topology]['Istr'] = string_iv_results[0]
-            string_dict['CURVES'][self.topology]['Vstr'] = string_iv_results[1]
+            string_dict['CURVES']['Istr'] = string_iv_results[0]
+            string_dict['CURVES']['Vstr'] = string_iv_results[1]
             string_dict['YIELD'][self.topology]['irrad'] = string_iv_results[2]
 
             # copy over to the central inverter which needs them
-            string_dict['CURVES']["central_inverter"]['Istr'] = string_iv_results[0]
-            string_dict['CURVES']["central_inverter"]['Vstr'] = string_iv_results[1]
+            # string_dict['CURVES']["central_inverter"]['Istr'] = string_iv_results[0]
+            # string_dict['CURVES']["central_inverter"]['Vstr'] = string_iv_results[1]
             string_dict['YIELD']["central_inverter"]['irrad'] = string_iv_results[2]
 
             mpp_results_dict = topology_solver.solve_string_inverter_mpp(self, string_dict)
@@ -402,8 +417,8 @@ class PanelizedObject:
                 for module in self.get_modules(surface, string):
                     module_dict = self.get_dict_instance([surface, string, module])
 
-                    Imod_hoy = module_dict['CURVES'][self.topology]['Imod'][hoy]
-                    Vmod_hoy = module_dict['CURVES'][self.topology]['Vmod'][hoy]
+                    Imod_hoy = module_dict['CURVES']['Imod'][hoy]
+                    Vmod_hoy = module_dict['CURVES']['Vmod'][hoy]
 
                     # interp the relationship between I and V for the hour o the module using the oeprating I
                     operating_vmp = np.round(np.interp(operating_imp, np.flipud(Imod_hoy),
@@ -434,8 +449,8 @@ class PanelizedObject:
 
         surface_iv_results = topology_solver.solve_central_inverter_iv(self, surface)
 
-        surface_dict['CURVES'][self.topology]['Isrf'] = surface_iv_results[0]
-        surface_dict['CURVES'][self.topology]['Vsrf'] = surface_iv_results[1]
+        surface_dict['CURVES']['Isrf'] = surface_iv_results[0]
+        surface_dict['CURVES']['Vsrf'] = surface_iv_results[1]
         surface_dict['YIELD'][self.topology]['irrad'] = surface_iv_results[2]
 
         mpp_results_dict = topology_solver.solve_central_inverter_mpp(self, surface_dict)
@@ -465,8 +480,8 @@ class PanelizedObject:
             for string in self.get_strings(surface):
                 string_dict = self.get_dict_instance([surface, string])
 
-                Istr_hoy = string_dict['CURVES'][self.topology]['Istr'][hoy]
-                Vstr_hoy = string_dict['CURVES'][self.topology]['Vstr'][hoy]
+                Istr_hoy = string_dict['CURVES']['Istr'][hoy]
+                Vstr_hoy = string_dict['CURVES']['Vstr'][hoy]
 
                 # interp the relationship between I and V for the hour o the module using the oeprating I
                 operating_imp = np.round(np.interp(operating_vmp, np.flipud(Vstr_hoy),
@@ -494,8 +509,8 @@ class PanelizedObject:
                 # then write this and then calculat ethe efficiency using the svaed irrad
                 for module in self.get_modules(surface, string):
                     module_dict = self.get_dict_instance([surface, string, module])
-                    Imod_hoy = module_dict['CURVES'][self.topology]['Imod'][hoy]
-                    Vmod_hoy = module_dict['CURVES'][self.topology]['Vmod'][hoy]
+                    Imod_hoy = module_dict['CURVES']['Imod'][hoy]
+                    Vmod_hoy = module_dict['CURVES']['Vmod'][hoy]
 
                     # interp the relationship between I and V for the hour on the module using the operating V from
                     # the central inverter
@@ -645,7 +660,7 @@ class PanelizedObject:
                 return results_df.loc[analysis_period]
 
 
-def solve_object_module_iv(panelizer_object, write_system=False, mp=False):
+def solve_object_module_iv(panelizer_object, write_system=False, mp=False, display_print=False):
 
     timeseries = panelizer_object.all_hoy
     tmy_location = utils.tmy_location(panelizer_object.tmy_file)
@@ -653,8 +668,10 @@ def solve_object_module_iv(panelizer_object, write_system=False, mp=False):
     psl = panelizer_object.tmy_dataframe['atmos_Pa'].values[timeseries]
 
     for surface in panelizer_object.get_surfaces():
-        print("----------------------------------------------")
-        print(f"Starting surface {surface}")
+        if display_print==True:
+            print("----------------------------------------------")
+        if display_print==True:
+            print(f"Starting surface {surface}")
         surface_start = time.time()
 
         # load radiance data
@@ -669,8 +686,10 @@ def solve_object_module_iv(panelizer_object, write_system=False, mp=False):
 
 
         for string in panelizer_object.get_strings(surface):
-            print("     -------------------")
-            print(f"    Starting string {string}")
+            if display_print==True:
+                print("     -------------------")
+            if display_print==True:
+                print(f"    Starting string {string}")
             string_start = time.time()
 
             string_dict = panelizer_object.get_dict_instance([surface, string])
@@ -689,7 +708,8 @@ def solve_object_module_iv(panelizer_object, write_system=False, mp=False):
             default_submodule_map, default_diode_map, default_subcell_map = utils.read_map_excel(map_file)
 
             if mp == False:
-                print(f"        Processing string modules and timeseries using a single core.")
+                if display_print==True:
+                    print(f"        Processing string modules and timeseries using a single core.")
                 for module_name in modules:
                     module_start = time.time()
                     module_dict = panelizer_object.get_dict_instance([surface, string, module_name])
@@ -706,32 +726,33 @@ def solve_object_module_iv(panelizer_object, write_system=False, mp=False):
                                                                                              default_subcell_map,
                                                                                              cell_type)
 
-                    module_dict['CURVES']["initial_simulation"][
-                        'Imod'] = module_i_dict
-                    module_dict['CURVES']["initial_simulation"][
-                        'Vmod'] = module_v_dict
-                    module_dict['YIELD']["initial_simulation"][
-                        'irrad'] = module_g_dict
+                    module_dict['CURVES']['Imod'] = module_i_dict
+                    module_dict['CURVES']['Vmod'] = module_v_dict
+                    module_dict['YIELD']["initial_simulation"]['irrad'] = module_g_dict
                     module_dict['PARAMETERS'] = module_params
                     module_end = time.time()
-                    print(f"            Time elapsed for module {module_name}: {round(module_end - module_start, 2)}s")
+                    if display_print == True:
+                        print(f"            Time elapsed for module {module_name}: {round(module_end - module_start, 2)}s")
 
             else: # MP is true
                 if len(modules) >= panelizer_object.ncpu:
-                    print(f"        Processing string {string} across the module list of length {len(modules)}")
+                    if display_print==True:
+                        print(f"        Processing string {string} across the module list of length {len(modules)}")
 
                     module_start = time.time()
                     compile_mp.main(panelizer_object, surface, string, tmy_location, dbt, psl, grid_pts, direct_ill,
                                                          diffuse_ill)
                     module_end = time.time()
-                    print(f"            Time elapsed for all modules: {round(module_end - module_start, 2)}s")
+                    if display_print==True:
+                        print(f"            Time elapsed for all modules: {round(module_end - module_start, 2)}s")
                     # simulations_mp.compile_system_mp_wrapper_module_loop(panelizer_object, surface, string, tmy_location, dbt, psl,
                     #                                          grid_pts, direct_ill, diffuse_ill)
                     # print(module_dict['PARAMETERS']['n_cols'])
 
 
                 else:
-                    print(f"        Multiprocessing for string {string}, the timeseries within the module list of length {len(modules)}")
+                    if display_print==True:
+                        print(f"        Multiprocessing for string {string}, the timeseries within the module list of length {len(modules)}")
                     # loop through individual modules and run the MP by chunking the timeseries
 
                     for module_name in modules:
@@ -753,23 +774,24 @@ def solve_object_module_iv(panelizer_object, write_system=False, mp=False):
                                                            default_subcell_map,
                                                            cell_type)
                         module_end = time.time()
-                        print(f"            Time elapsed for module {module_name}: {round(module_end - module_start, 2)}s")
+                        if display_print==True:
+                            print(f"            Time elapsed for module {module_name}: {round(module_end - module_start, 2)}s")
 
-                        module_dict['CURVES']["initial_simulation"][
-                            'Imod'] = mp_results[0]
-                        module_dict['CURVES']["initial_simulation"][
-                            'Vmod'] = mp_results[1]
-                        module_dict['YIELD']["initial_simulation"][
-                            'irrad'] = mp_results[2]
+                        module_dict['CURVES']['Imod'] = mp_results[0]
+                        module_dict['CURVES']['Vmod'] = mp_results[1]
+                        module_dict['YIELD']["initial_simulation"]['irrad'] = mp_results[2]
                         module_dict['PARAMETERS'] = mp_results[3][0]
 
             string_end = time.time()
-            print(f"    Time elapsed for string {string}: {round(string_end - string_start, 2)}s")
+            if display_print==True:
+                print(f"    Time elapsed for string {string}: {round(string_end - string_start, 2)}s")
 
         surface_end = time.time()
-        print(f"Time elapsed for surface {surface}: {round(surface_end - surface_start, 2)}s")
+        if display_print==True:
+            print(f"Time elapsed for surface {surface}: {round(surface_end - surface_start, 2)}s")
 
-    panelizer_object.delete_cell_location()
+    # panelizer_object.delete_cell_location()
+
     # if write_system == True:
     #     print("Panelizer has completed writing input data into dict. File will now be saved.")
     #     utils.write_pickle(panelizer_object, panelizer_object.system_file)
