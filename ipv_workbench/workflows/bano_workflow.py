@@ -11,24 +11,27 @@ from tqdm import tqdm
 
 
 def main():
-    project_folder = "/Users/jmccarty/Desktop/bano_simulations"
+    project_folder = r"C:\Users\Justin\Desktop\bano_project_folder"
     year_list = [2020, 2050, 2080]
-    building_list = ["B1391"] #["B1360", "B1389", "B1390", "B1391", "B1392", "B1394", "B2494"]
+    building_list = ["B1360", "B1389", "B1390", "B1391", "B1392", "B1393", "B1394", "B2494"]
     all_topologies = ['micro_inverter', 'string_inverter', 'central_inverter']
     log_file = os.path.join(project_folder,'shared','resources','log_file.txt')
     for year in year_list:
-        for cell_technology in ["A", "B", "C", "D", "E"]:
+        for front_cover in ["solar_glass", "light_grey", "basic_white"]:
             for orientation in ["P", "L"]:
-                for front_cover in ["solar_glass", "light_grey", "basic_white"]:
+                for cell_technology in ["A", "B", "C", "D", "E"]:
+
+                    # this is key (setting the scenario)
                     scenario = f"{cell_technology}{orientation}_{front_cover}_{year}"
                     print(r"-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-")
                     print(scenario)
-                    building_results_files = {all_topologies[0]:[],
-                                              all_topologies[1]:[],
-                                              all_topologies[2]:[]}
+
+                    # building_results_files = {all_topologies[0]:[],
+                    #                           all_topologies[1]:[],
+                    #                           all_topologies[2]:[]}
                     object_detail_dicts = []
-                    pmp_results = {}
-                    irrad_results = {}
+                    # pmp_results = {}
+                    # irrad_results = {}
                     for building in tqdm(building_list):
                         start_time = time.time()
 
@@ -39,13 +42,21 @@ def main():
                         panelizer_object.analysis_location = 'zurich'
                         panelizer_object.analysis_year = year
                         panelizer_object.set_tmy_data()
-                        all_hoy = panelizer_object.set_analysis_period(0, 4000, 1)
+                        all_hoy = panelizer_object.set_analysis_period(0, 48, 1)
                         custom_device_data = pd.read_csv(panelizer_object.module_cell_data, index_col='scenario').loc[
                             f"{cell_technology}{orientation}"].to_dict()
                         panelizer_object.cell = devices.Cell(custom_device_data)
 
+                        # skip results if they exist DEBUGGING ONLY
+                        result_file_building = building_target_file = os.path.join(panelizer_object.RESULTS_DIR, 'timeseries',
+                                                                                   f"{scenario}_central_inverter_building_level_results_hourly.csv")
+                        if os.path.exists(result_file_building):
+                            print("Result exists, skipping iteration")
+                            continue
+
+
                         # run the major simulation
-                        panelizer.solve_object_module_iv(panelizer_object, mp=True)
+                        panelizer.solve_object_module_iv(panelizer_object, mp=False)
 
                         # transfer necessary data between levels
                         panelizer_object.transfer_initial()
@@ -90,18 +101,25 @@ def main():
                             # write results
                             building_results_file = ipv_results.write_building_results_timeseries(panelizer_object,
                                                                                                   scenario, topology)
-                            building_results_files[topology].append(building_results_file)
+                            # building_results_files[topology].append(building_results_file)
 
-                            pmp_results.update(
-                                {topology: np.sum(np.fromiter(panelizer_object.get_dict_instance([])['YIELD'][topology]['pmp'].values(), dtype=float))})
-                            irrad_results.update(
-                                {topology: np.sum(np.fromiter(panelizer_object.get_dict_instance([])['YIELD'][topology]['irrad'].values(), dtype=float))})
+                            # pmp_results.update(
+                            #     {topology: np.sum(np.fromiter(panelizer_object.get_dict_instance([])['YIELD'][topology]['pmp'].values(), dtype=float))})
+                            # irrad_results.update(
+                            #     {topology: np.sum(np.fromiter(panelizer_object.get_dict_instance([])['YIELD'][topology]['irrad'].values(), dtype=float))})
                         end_time = time.time()
                         run_time = end_time - start_time
                         log_string = f"{year},{cell_technology},{orientation},{front_cover},{building},{np.round(run_time,3)}\n"
                         utils.log_run(log_file, log_string)
+
                     for topology in all_topologies:
-                        bldg_results = [pd.read_csv(fp, index_col="index") for fp in building_results_files[topology]]
+                        building_results_files = []
+                        for building in building_list:
+                            building_result_file = os.path.join(project_folder, 'objects', building, 'results',
+                                                                'timeseries',
+                                                                f"{scenario}_{topology}_building_level_results_hourly.csv")
+                            building_results_files.append(building_result_file)
+                        bldg_results = [pd.read_csv(fp, index_col="index") for fp in building_results_files]
                         cumulative_df = ipv_results.write_cumulative_scenario_results(project_folder,
                                                                                       all_hoy,
                                                                                       scenario,
@@ -111,8 +129,6 @@ def main():
 
                         ipv_results.write_condensed_result(project_folder,
                                                            object_detail_dicts,
-                                                           pmp_results[topology],
-                                                           irrad_results[topology],
                                                            cumulative_df,
                                                            scenario,
                                                            topology)

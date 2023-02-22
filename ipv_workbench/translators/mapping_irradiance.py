@@ -30,6 +30,7 @@ def load_irradiance_file(bldg_radiance_dir, rad_surface_key, component):
     radiance_results_dir = os.path.join(bldg_radiance_dir, f"surface_{rad_surface_key}", "results")
     component_results_dir = os.path.join("annual_irradiance", "results", f"{component}")
     sun_up_path = os.path.join(radiance_results_dir, component_results_dir, "sun-up-hours.txt")
+    # print(os.path.join(radiance_results_dir, component_results_dir))
     ill_path = glob.glob(os.path.join(radiance_results_dir, component_results_dir, "*.ill"))[0]
     return utils.build_full_ill(sun_up_path, ill_path)
 

@@ -78,7 +78,7 @@ class PanelizedObject:
         utils.directory_creator(self.MODULE_CELL_DIR)
         self.module_cell_data = os.path.join(self.MODULE_CELL_DIR, "cell_module_datasheet.csv")
         self.cec_data = os.path.join(self.MODULE_CELL_DIR, "cec_database_local.csv")
-        self.MAPS_DIR = os.path.join(self.RESOURCES_DIR, "map_files")
+        self.MAPS_DIR = os.path.join(self.MODULE_CELL_DIR, "map_files")
         utils.directory_creator(self.MAPS_DIR)
         self.map_files = glob.glob(os.path.join(self.MAPS_DIR, "*.xls*"))
 
