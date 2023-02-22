@@ -80,6 +80,35 @@ def skoplaki_temperature_correction(G_effective, T_ambient, Ws, w=2.4):
 # ================================ Curve Calculations ================================
 
 
+def calculate_module_map_dependent(Gmod, Tmod, module_dict, ivcurve_pnts=1000):
+    if module_dict['PARAMETERS']['N_subcells'] > 1:
+        if module_dict['PARAMETERS']['orientation'] == 'portrait':
+            Imod, Vmod = calculate_module_curve_single_row(Gmod,
+                                                           Tmod,
+                                                           module_dict['PARAMETERS'],
+                                                           module_dict['MAPS']['SUBMODULES'],
+                                                           module_dict['MAPS']['DIODES'],
+                                                           module_dict['MAPS']['SUBCELLS'],
+                                                           ivcurve_pnts)
+        else:
+            Imod, Vmod = calculate_module_curve_single_column(Gmod,
+                                                              Tmod,
+                                                              module_dict['PARAMETERS'],
+                                                              module_dict['MAPS']['SUBMODULES'],
+                                                              module_dict['MAPS']['DIODES'],
+                                                              module_dict['MAPS']['SUBCELLS'],
+                                                              ivcurve_pnts)
+
+    else:
+        Imod, Vmod = calculate_module_curve_multiple_column(Gmod,
+                                                            Tmod,
+                                                            module_dict['PARAMETERS'],
+                                                            module_dict['MAPS']['SUBMODULES'],
+                                                            module_dict['MAPS']['DIODES'],
+                                                            ivcurve_pnts)
+
+    return Imod, Vmod
+
 def calculate_module_curve(irradiance_hoy, temperature_hoy, module_dict, cell_params):
     # TODO break apart into constituent pieces
 
