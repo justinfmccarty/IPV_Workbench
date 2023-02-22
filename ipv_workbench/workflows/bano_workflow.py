@@ -98,18 +98,16 @@ def run_building(project_folder, cell_technology, orientation, front_cover, buil
 
 
 def main():
-    project_folder = "/Users/jmccarty/Desktop/bano_simulations"
+    project_folder = r"C:\Users\Justin\Desktop\bano_project_folder"
     year_list = [2020, 2050, 2080]
-    building_list = ["B1391"]  # ["B1360", "B1389", "B1390", "B1391", "B1392", "B1393", "B1394", "B2494"]
+    building_list = ["B1360", "B1389", "B1390", "B1391", "B1392", "B1393", "B1394", "B2494"]
     all_topologies = ['micro_inverter', 'string_inverter', 'central_inverter']
     log_file = os.path.join(project_folder, 'shared', 'resources', 'log_file.txt')
     hourly_resolution = 2  #run every N hours (interpolate between the results at the very end)
     for year in year_list:
-        for orientation in ["P", "L"]:
-            for cell_technology in ["A", "B", "C", "D", "E"]:
-                for front_cover in ["solar_glass", "light_grey", "basic_white"]:
-
-
+        for front_cover in ["solar_glass", "light_grey", "basic_white"]:
+            for orientation in ["P", "L"]:
+                for cell_technology in ["A", "B", "C", "D", "E"]:
 
                     # this is key (setting the scenario)
                     scenario = f"{cell_technology}{orientation}_{front_cover}_{year}"

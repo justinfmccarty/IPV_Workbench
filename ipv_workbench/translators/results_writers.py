@@ -305,6 +305,6 @@ def write_condensed_result(project_folder, object_detail_dicts, df, scenario, to
 
     # save the file
     workbook.save(filename=excel_dest)
-    write_out_folder = os.path.join("/Users/jmccarty/Desktop",
+    write_out_folder = os.path.join(r"C:\Users\Justin\Nextcloud\Teaching\22_HS\polikseni_bano\polikseni_share\condensed_simulation_results",
                                     f"{scenario_long}_{topology}_cumulative_results.xlsx")
     workbook.save(filename=write_out_folder)

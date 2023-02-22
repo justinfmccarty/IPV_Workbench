@@ -1,6 +1,6 @@
 from pvlib import pvsystem, singlediode
 import numpy as np
-import multiprocess as mp
+import multiprocessing as mp
 from tqdm import notebook
 from ipv_workbench.translators import module_mapping as ipv_mm
 from ipv_workbench.solver import calculations
@@ -15,6 +15,9 @@ def main(panelizer_object, surface, string, tmy_location, dbt, psl, grid_pts, di
     timeseries = panelizer_object.all_hoy
     ncpu = panelizer_object.ncpu
     modules = panelizer_object.get_modules(surface, string)
+
+    if len(modules) < ncpu:
+        ncpu = len(modules)
     module_dict_list = [panelizer_object.get_dict_instance([surface, string, module_name]) for module_name in modules]
     # pv_cells_xyz_arr_list = [np.array(panelizer_object.get_cells_xyz(surface, string, module_name)) for module_name in modules]
     # pv_cells_xyz_arr_chunks = []
