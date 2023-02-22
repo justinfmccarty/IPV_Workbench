@@ -59,3 +59,16 @@ def create_timestep_chunks(total_timesteps, ncpu):
     incre_chunks = [np.arange(i, i + incre) for i in incre_range]
 
     return incre_chunks
+
+
+def build_analysis_period(sunup_array,hourly_resolution):
+    annual_hourly_timeseries = np.arange(0, 8760, 1)
+    sunup_timeseries = annual_hourly_timeseries[sunup_array].flatten()
+    analysis_timeseries = sunup_timeseries[::hourly_resolution]
+    if analysis_timeseries[-1] == sunup_timeseries[-1]:
+        pass
+    else:
+        analysis_timeseries = np.append(analysis_timeseries, sunup_timeseries[-1])
+
+    return analysis_timeseries
+
