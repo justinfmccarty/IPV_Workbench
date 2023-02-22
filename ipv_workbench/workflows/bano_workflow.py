@@ -42,7 +42,7 @@ def main():
                         panelizer_object.analysis_location = 'zurich'
                         panelizer_object.analysis_year = year
                         panelizer_object.set_tmy_data()
-                        all_hoy = panelizer_object.set_analysis_period(0, 48, 1)
+                        all_hoy = panelizer_object.set_analysis_period(0, 8760, 1)
                         custom_device_data = pd.read_csv(panelizer_object.module_cell_data, index_col='scenario').loc[
                             f"{cell_technology}{orientation}"].to_dict()
                         panelizer_object.cell = devices.Cell(custom_device_data)
@@ -56,7 +56,7 @@ def main():
 
 
                         # run the major simulation
-                        panelizer.solve_object_module_iv(panelizer_object, mp=False)
+                        panelizer.solve_object_module_iv(panelizer_object, mp=True)
 
                         # transfer necessary data between levels
                         panelizer_object.transfer_initial()
