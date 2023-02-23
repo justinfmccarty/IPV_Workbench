@@ -112,7 +112,6 @@ def write_building_results_timeseries(po, scenario, topology):
         results_dict.update({"index": time_utils.hoy_to_date(np.arange(0,8760,1))})
 
     results_dict.update({f"irrad_whole_building_kwh": np.sum(surface_irrad,axis=0)})
-    utils.write_pickle(results_dict,"/Users/jmccarty/Desktop/building_results.pickle")
     df = pd.DataFrame(results_dict).set_index("index").round(3)
 
     sunup_df = df.iloc[po.sunup_array].interpolate()

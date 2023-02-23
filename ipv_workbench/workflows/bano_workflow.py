@@ -100,7 +100,7 @@ def run_building(project_folder, cell_technology, orientation, front_cover, buil
 def main():
     project_folder = r"C:\Users\Justin\Desktop\bano_project_folder"
     year_list = [2020, 2050, 2080]
-    building_list = ["B1360", "B1389", "B1390", "B1391", "B1392", "B1393", "B1394", "B2494"]
+    building_list = ["B1391", "B1389", "B1390", "B1360", "B1392", "B1393", "B1394", "B2494"]
     all_topologies = ['micro_inverter', 'string_inverter', 'central_inverter']
     log_file = os.path.join(project_folder, 'shared', 'resources', 'log_file.txt')
     hourly_resolution = 2  #run every N hours (interpolate between the results at the very end)
@@ -116,7 +116,7 @@ def main():
                     object_detail_dicts = []
 
                     for building in building_list:
-                        print(f"Starting {building}, {scenario}")
+                        print(f"Starting {scenario}, {building}")
                         object_details = run_building(project_folder, cell_technology, orientation, front_cover,
                                                       building, year, scenario, log_file, all_topologies, hourly_resolution)
                         object_detail_dicts.append(object_details)
