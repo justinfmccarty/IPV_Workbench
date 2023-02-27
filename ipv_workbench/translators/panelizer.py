@@ -813,6 +813,7 @@ def solve_object_module_iv(panelizer_object, write_system=False, mp=False, displ
 def compile_system_single_core(module_dict, timeseries, tmy_location, dbt, psl, pv_cells_xyz_arr, grid_pts, direct_ill,
                                diffuse_ill, base_parameters, custom_module_data, default_submodule_map,
                                default_diode_map, default_subcell_map, cell_type):
+
     G_eff_ann, C_temp_ann_arr = build_module_features(module_dict, timeseries, tmy_location, dbt, psl, pv_cells_xyz_arr,
                                                       grid_pts, direct_ill, diffuse_ill,
                                                       base_parameters, custom_module_data,
@@ -844,7 +845,7 @@ def compile_system_single_core(module_dict, timeseries, tmy_location, dbt, psl, 
         module_v_dict.update({hoy: np.round(Vmod, 5)})
         # Gmod is originally an array of W/m2 for each cell. Need to convert this array to W by multiply by cell area
         # then take the sum of irradiance for all the cells
-        Gmod = Gmod * (module_dict['PARAMETERS']['one_subcell_area_m2'] * module_dict['PARAMETERS']['total_cells'])
+        Gmod = Gmod * module_dict['PARAMETERS']['one_subcell_area_m2']
         module_g_dict.update({hoy: np.round(np.sum(Gmod), 1)})
 
     return module_i_dict, module_v_dict, module_g_dict, module_dict['PARAMETERS']

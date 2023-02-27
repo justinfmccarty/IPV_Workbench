@@ -254,7 +254,6 @@ def remap_cigs_no_subcell(parameters):
     return out_submodule_map, out_diode_map, out_subcell_map, N_s, N_p, N_diodes, N_subcells
 
 
-# TODO need to make a rows version
 def remap_subcell_cols(parameters, default_subcell_map):
     actual_cols = parameters['n_cols']
     actual_rows = parameters['n_rows']
@@ -376,7 +375,7 @@ def remap_subcell_cols(parameters, default_subcell_map):
 
     N_p = int(len(np.unique(out_submodule_map)))
     N_diodes = int(len(np.unique(out_diode_map)))
-    N_subcells = parameters['N_subcells']
+    N_subcells = np.unique(new_subcell_map.flatten()) # parameters['N_subcells']
     N_s = int((actual_cols * actual_rows) / N_subcells / N_p)
 
     return out_submodule_map, out_diode_map, out_subcell_map, N_s, N_p, N_diodes, N_subcells

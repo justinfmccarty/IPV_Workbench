@@ -102,10 +102,11 @@ def solve_cells(parameters, Geff, Tcell, ivcurve_pnts=1000):
     # the subcell current is calculated by dividing currents by the number of subcells.
     I, V, P = singlediode.bishop88(evaluated_voltages, *sde_args, **kwargs)
 
-    return I / parameters['N_p'], V / parameters['N_s']
+    return I / parameters['N_p_ideal'], V / parameters['N_s_ideal']
 
 
 def solve_subcells(evaluated_voltages, parameters, Geff, Tcell, ivcurve_pnts=1000):
+    # TODO make subcells work with N_p
     """
     Use De Soto and Bishop to simulate a full IV curve with both
     forward and reverse bias regions.
@@ -144,8 +145,9 @@ def solve_subcells(evaluated_voltages, parameters, Geff, Tcell, ivcurve_pnts=100
                                           *sde_args[:, n],
                                           **kwargs
                                           )
+
         i_ = i_ / num_subcells
-        v_ = v_ / parameters['N_s']
+        v_ = v_ / parameters['N_s_ideal']
         i_subcell.append(i_)
         v_subcell.append(v_)
 
