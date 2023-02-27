@@ -143,7 +143,7 @@ class PanelizedObject:
             hourly_resolution = 1
         else:
             hourly_resolution = self.hourly_resolution
-        self.all_hoy = time_utils.build_analysis_period(self.sunup_array, hourly_resolution)[0:120]
+        self.all_hoy = time_utils.build_analysis_period(self.sunup_array, hourly_resolution)
 
         return self.all_hoy
 
@@ -755,6 +755,7 @@ def solve_object_module_iv(panelizer_object, write_system=False, mp=False, displ
                 module_end = time.time()
                 if display_print == True:
                     print(f"            Time elapsed for all modules: {round(module_end - module_start, 2)}s")
+
                 # simulations_mp.compile_system_mp_wrapper_module_loop(panelizer_object, surface, string, tmy_location, dbt, psl,
                 #                                          grid_pts, direct_ill, diffuse_ill)
                 # print(module_dict['PARAMETERS']['n_cols'])
@@ -841,7 +842,10 @@ def compile_system_single_core(module_dict, timeseries, tmy_location, dbt, psl, 
 
         module_i_dict.update({hoy: np.round(Imod, 5)})
         module_v_dict.update({hoy: np.round(Vmod, 5)})
-        module_g_dict.update({hoy: np.round(np.sum(Gmod * module_dict['PARAMETERS']['one_subcell_area_m2']), 1)})
+        # Gmod is originally an array of W/m2 for each cell. Need to convert this array to W by multiply by cell area
+        # then take the sum of irradiance for all the cells
+        Gmod = Gmod * (module_dict['PARAMETERS']['one_subcell_area_m2'] * module_dict['PARAMETERS']['total_cells'])
+        module_g_dict.update({hoy: np.round(np.sum(Gmod), 1)})
 
     return module_i_dict, module_v_dict, module_g_dict, module_dict['PARAMETERS']
 

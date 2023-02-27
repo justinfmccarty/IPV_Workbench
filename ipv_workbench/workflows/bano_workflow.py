@@ -25,8 +25,6 @@ def run_building(project_folder, cell_technology, orientation, front_cover, buil
     panelizer_object.hourly_resolution = hourly_resolution
     panelizer_object.set_analysis_period()
 
-
-
     custom_device_data = pd.read_csv(panelizer_object.module_cell_data, index_col='scenario').loc[
         f"{cell_technology}{orientation}"].to_dict()
     panelizer_object.cell = devices.Cell(custom_device_data)
@@ -85,41 +83,42 @@ def run_building(project_folder, cell_technology, orientation, front_cover, buil
     run_time = end_time - start_time
     log_string = f"{year},{cell_technology},{orientation},{front_cover},{building},{np.round(run_time, 3)}\n"
     utils.log_run(log_file, log_string)
-    print(f"    {building}, {scenario} completed in {round(run_time,1)} seconds.")
-    pickel_start = time.time()
-    print("     Storing object")
-    utils.write_pickle(panelizer_object,
-                       os.path.join(panelizer_object.COLD_DIR,f"{scenario}_{building}.xz"),
-                       compress=True)
-    pickle_end = time.time() - pickel_start
-    print(f"        {round(pickle_end,1)} seconds to compress pickle")
+    print(f"    {building}, {scenario} completed in {round(run_time, 1)} seconds.")
+
+    # pickel_start = time.time()
+    # print("     Storing object")
+    # utils.write_pickle(panelizer_object,
+    #                    os.path.join(panelizer_object.COLD_DIR,f"{scenario}_{building}.xz"),
+    #                    compress=True)
+    # pickle_end = time.time() - pickel_start
+    # print(f"        {round(pickle_end,1)} seconds to compress pickle")
+
     print(f"    Completed {building} {scenario}")
     return panelizer_object.get_dict_instance([])['DETAILS']
 
 
 def main():
     project_folder = r"C:\Users\Justin\Desktop\bano_project_folder"
-    year_list = [2020, 2050, 2080]
+    year_list = [2020, 2080]
     building_list = ["B1391", "B1389", "B1390", "B1360", "B1392", "B1393", "B1394", "B2494"]
     all_topologies = ['micro_inverter', 'string_inverter', 'central_inverter']
     log_file = os.path.join(project_folder, 'shared', 'resources', 'log_file.txt')
-    hourly_resolution = 2  #run every N hours (interpolate between the results at the very end)
-    for year in year_list:
-        for front_cover in ["solar_glass", "light_grey", "basic_white"]:
-            for orientation in ["P", "L"]:
-                for cell_technology in ["A", "B", "C", "D", "E"]:
+    hourly_resolution = 3  # run every N hours (interpolate between the results at the very end)
+
+    for front_cover in ["solar_glass", "light_grey", "basic_white"]:
+        for year in year_list:
+            for cell_technology in ["A", "B", "C", "D"]:
+                for orientation in ["P", "L"]:
+
 
                     # this is key (setting the scenario)
                     scenario = f"{cell_technology}{orientation}_{front_cover}_{year}"
                     print(r"-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-")
 
-                    object_detail_dicts = []
-
                     for building in building_list:
                         print(f"Starting {scenario}, {building}")
-                        object_details = run_building(project_folder, cell_technology, orientation, front_cover,
-                                                      building, year, scenario, log_file, all_topologies, hourly_resolution)
-                        object_detail_dicts.append(object_details)
+                        run_building(project_folder, cell_technology, orientation, front_cover,
+                                     building, year, scenario, log_file, all_topologies, hourly_resolution)
 
                     for topology in all_topologies:
                         building_results_files = []
@@ -128,17 +127,20 @@ def main():
                                                                 'timeseries',
                                                                 f"{scenario}_{topology}_building_level_results_hourly.csv")
                             building_results_files.append(building_result_file)
-                        bldg_results = [pd.read_csv(fp, index_col="index") for fp in building_results_files]
+                        building_results_df_list = [pd.read_csv(fp, index_col="index") for fp in building_results_files]
                         cumulative_df = ipv_results.write_cumulative_scenario_results(project_folder,
                                                                                       scenario,
                                                                                       topology,
-                                                                                      bldg_results)
-
+                                                                                      building_results_df_list)
+                        print("Completed cumulative results.")
                         ipv_results.write_condensed_result(project_folder,
-                                                           object_detail_dicts,
+                                                           building_results_df_list,
                                                            cumulative_df,
                                                            scenario,
-                                                           topology)
+                                                           topology,
+                                                           save_to_project=True,
+                                                           secondary_destination=r"C:\Users\Justin\Nextcloud\Teaching\22_HS\polikseni_bano\polikseni_share\condensed_simulation_results")
+                        print("Completed condensing results.")
 
 
 if __name__ == "__main__":

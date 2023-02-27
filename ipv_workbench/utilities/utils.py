@@ -437,3 +437,24 @@ def log_run(file_path, write_string):
     #file_path = os.path.join(folder,"runtime.txt")
     with open(file_path, "a") as fp:
         fp.write(write_string)
+
+
+def get_object_capacity(object_hourly_results):
+    capacity_cols = []
+    for col in object_hourly_results.columns:
+        if "_kwp" in col:
+            if "kwh" in col:
+                pass
+            else:
+                capacity_cols.append(col)
+
+    return object_hourly_results[capacity_cols].iloc[0].sum()
+
+
+def get_object_surface_area(object_hourly_results):
+    area_cols = []
+    for col in object_hourly_results.columns:
+        if "surface_area" in col:
+            area_cols.append(col)
+
+    return object_hourly_results[area_cols].iloc[0].sum()

@@ -96,11 +96,11 @@ def write_building_results_timeseries(po, scenario, topology):
         surface_irrad_kwh = surface_irrad_wh_annual_df[0].values / 1000
 
         surface_irrad.append(surface_irrad_kwh)
-        results_dict.update({f"irrad_bulk_{surface_clean}_{general_dir}_kWh": surface_irrad_kwh})
+        results_dict.update({f"irrad_bulk_{surface_clean}_{general_dir}_kwh": surface_irrad_kwh})
 
         # rad intensity
         surface_irrad_intensity_kwh = surface_irrad_kwh / surface_area
-        results_dict.update({f"irrad_intensity_{surface_clean}_{general_dir}_kWh_m2": surface_irrad_intensity_kwh})
+        results_dict.update({f"irrad_intensity_{surface_clean}_{general_dir}_kwh_m2": surface_irrad_intensity_kwh})
 
         # self sufficiency, consumption
         self_suff, self_cons = utils.calc_self_sufficiency_consumption(electricity_load_timeseries,
@@ -128,7 +128,7 @@ def write_building_results_timeseries(po, scenario, topology):
     return building_target_file
 
 
-def write_cumulative_scenario_results(project_folder, scenario, topology, bldg_results_list):
+def write_cumulative_scenario_results(project_folder, scenario, topology, bldg_results_list, cumulative_target_folder=None):
     year = scenario.split("_")[-1]
 
     # load demand profile
@@ -137,8 +137,13 @@ def write_cumulative_scenario_results(project_folder, scenario, topology, bldg_r
     electricity_load_timeseries = electricity_load.values
 
     # set result file
-    cumulative_target_file = os.path.join(project_folder, 'objects', "cumulative_results",
-                                          f"{scenario}_{topology}_cumulative_hourly.csv")
+    if cumulative_target_folder is None:
+        cumulative_target_file = os.path.join(project_folder, 'objects', "cumulative_results",
+                                              f"{scenario}_{topology}_cumulative_hourly.csv")
+    else:
+        cumulative_target_file = os.path.join(cumulative_target_folder,
+                                              f"{scenario}_{topology}_cumulative_hourly.csv")
+
 
     utils.directory_creator(Path(cumulative_target_file).parent)
 
@@ -167,8 +172,9 @@ def write_cumulative_scenario_results(project_folder, scenario, topology, bldg_r
 
     cumulative_dict.update({f"electricity_demand_kwh": electricity_load_timeseries})
 
-    for direction in [("_r_", "roof_tops"), ("_west_", "west_facade"), ("_east_", "east_facade"),
-                      ("_north_", "north_facade"), ("_south_", "south_facade")]:
+    directions = [("_r", "roof_tops"), ("_west_", "west_facade"), ("_east_", "east_facade"),
+                  ("_north_", "north_facade"), ("_south_", "south_facade")]
+    for direction in directions:
         # build col lists
         bulk_gen_buildings = []
         capacity_buildings = []
@@ -176,6 +182,7 @@ def write_cumulative_scenario_results(project_folder, scenario, topology, bldg_r
         irrad_buildings = []
         for bldg_df in bldg_results_list:
             gen_cols = [col for col in bldg_df.columns if (f"{direction[0]}" in col) & ("gen_bulk" in col)]
+            print(gen_cols)
             bulk_gen_buildings.append(np.sum(bldg_df[gen_cols].values, axis=1))
 
             capacity_cols = [col for col in bldg_df.columns if (f"{direction[0]}" in col) & ("surface_capacity_" in col)]
@@ -185,7 +192,22 @@ def write_cumulative_scenario_results(project_folder, scenario, topology, bldg_r
             area_buildings.append(np.sum(bldg_df[area_cols].values, axis=1))
 
             irrad_cols = [col for col in bldg_df.columns if (f"{direction[0]}" in col) & ("irrad_bulk_" in col)]
+            print(irrad_cols)
             irrad_buildings.append(np.sum(bldg_df[irrad_cols].values, axis=1))
+
+        # gen_cols = [col for col in bldg_df.columns if all([x in col for x in [direction[0], "gen_bulk"]])]
+        # print(gen_cols)
+        # bulk_gen_buildings.append(np.sum(bldg_df[gen_cols].values, axis=1))
+        #
+        # capacity_cols = [col for col in bldg_df.columns if all([x in col for x in [direction[0], "surface_capacity_"]])]
+        # capacity_buildings.append(np.sum(bldg_df[capacity_cols].values, axis=1))
+        #
+        # area_cols = [col for col in bldg_df.columns if all([x in col for x in [direction[0], "surface_area_"]])]
+        # area_buildings.append(np.sum(bldg_df[area_cols].values, axis=1))
+        #
+        # irrad_cols = [col for col in bldg_df.columns if all([x in col for x in [direction[0], "irrad_bulk_"]])]
+        # print(irrad_cols)
+        # irrad_buildings.append(np.sum(bldg_df[irrad_cols].values, axis=1))
 
         # bulk_generation
         directional_generation = np.sum(bulk_gen_buildings,axis=0)
@@ -250,22 +272,28 @@ def change_scenario_code(whole_scenario):
     return f"{module_long}_{orientation_long}_{scenario[1]}_{scenario[2]}_{scenario[3]}"
 
 
-def write_condensed_result(project_folder, object_detail_dicts, df, scenario, topology):
+def write_condensed_result(project_folder, building_results_df_list, df, scenario, topology, save_to_project=True, secondary_destination=None):
     scenario_long = change_scenario_code(scenario)
 
     pmp = df['electricity_gen_cumulative_kwh'].sum()
     irrad = df['irradiance_cumulative_kwh'].sum()
-
+    file_name = f"{scenario_long}_{topology}_cumulative_results.xlsx"
     excel_dest = os.path.join(project_folder, 'objects', "cumulative_condensed",
-                              f"{scenario_long}_{topology}_cumulative_results.xlsx")
+                              file_name)
 
-    my_cols = ['electricity_gen_cumulative_kwh', 'electricity_gen_east_facade_kwh', 'electricity_gen_west_facade_kwh',
-               'electricity_gen_south_facade_kwh', 'electricity_gen_north_facade_kwh', 'electricity_gen_roof_tops_kwh']
-    dest_cols = ['E_PV_gen_kWh', 'Electricity production from photovoltaic panels on east facades [kWh]',
-                 'Electricity production from photovoltaic panels on west facades [kWh]',
-                 'Electricity production from photovoltaic panels on south facades [kWh]',
-                 'Electricity production from photovoltaic panels on north facades [kWh]',
-                 'Electricity production from photovoltaic panels on roof tops [kWh]']
+
+    my_cols = ['electricity_gen_cumulative_kwh',
+               'electricity_gen_east_facade_kwh',
+               'electricity_gen_west_facade_kwh',
+               'electricity_gen_south_facade_kwh',
+               'electricity_gen_north_facade_kwh',
+               'electricity_gen_roof_tops_kwh']
+    dest_cols = ['E_PV_gen_kwh',
+                 'Electricity production from photovoltaic panels on east facades [kwh]',
+                 'Electricity production from photovoltaic panels on west facades [kwh]',
+                 'Electricity production from photovoltaic panels on south facades [kwh]',
+                 'Electricity production from photovoltaic panels on north facades [kwh]',
+                 'Electricity production from photovoltaic panels on roof tops [kwh]']
 
     df[my_cols].rename(columns=dict(zip(my_cols, dest_cols))).to_excel(excel_dest)
 
@@ -278,22 +306,28 @@ def write_condensed_result(project_folder, object_detail_dicts, df, scenario, to
     # area
     row = 2
     sheet[f"N{row}"] = "total PV area (m2)"
-    sheet[f"O{row}"] = np.sum([object_dict_detail['installed_area_m2'] for object_dict_detail in object_detail_dicts])
+    installed_pv_area_m2 = np.sum([utils.get_object_surface_area(df) for df in building_results_df_list])
+    sheet[f"O{row}"] = installed_pv_area_m2
+    # sheet[f"O{row}"] = np.sum([object_dict_detail['installed_area_m2'] for object_dict_detail in object_detail_dicts])
 
     # capacity
     row = 5
     sheet[f"N{row}"] = "nominal power (W)"
-    sheet[f"O{row}"] = np.sum([object_dict_detail['installed_capacity_Wp'] for object_dict_detail in object_detail_dicts])
+    installed_pv_capacity_wp = np.sum([utils.get_object_capacity(df) for df in building_results_df_list])
+    sheet[f"O{row}"] = installed_pv_capacity_wp
+    # sheet[f"O{row}"] = np.sum([object_dict_detail['installed_capacity_Wp'] for object_dict_detail in object_detail_dicts])
 
     # area
     row = 6
     sheet[f"N{row}"] = "module area (m2)"
-    sheet[f"O{row}"] = np.sum([object_dict_detail['installed_area_m2'] for object_dict_detail in object_detail_dicts])
+    sheet[f"O{row}"] = installed_pv_area_m2
+    # sheet[f"O{row}"] = np.sum([object_dict_detail['installed_area_m2'] for object_dict_detail in object_detail_dicts])
 
     # capacity
     row = 8
     sheet[f"N{row}"] = "kW (inverter)"
-    sheet[f"O{row}"] = np.sum([object_dict_detail['installed_capacity_Wp'] for object_dict_detail in object_detail_dicts]) / 1000
+    sheet[f"O{row}"] = installed_pv_capacity_wp / 1000
+    # sheet[f"O{row}"] = np.sum([object_dict_detail['installed_capacity_Wp'] for object_dict_detail in object_detail_dicts]) / 1000
 
     # efficiency
     total_power = pmp#np.sum([pmp for pmp in pmp_results])
@@ -303,7 +337,10 @@ def write_condensed_result(project_folder, object_detail_dicts, df, scenario, to
     sheet[f"O{row}"] = np.round(100 * (total_power / total_irrad), 3)
 
     # save the file
-    workbook.save(filename=excel_dest)
-    write_out_folder = os.path.join(r"C:\Users\Justin\Nextcloud\Teaching\22_HS\polikseni_bano\polikseni_share\condensed_simulation_results",
-                                    f"{scenario_long}_{topology}_cumulative_results.xlsx")
-    workbook.save(filename=write_out_folder)
+    if save_to_project is True:
+        workbook.save(filename=excel_dest)
+
+    if secondary_destination is not None:
+        secondary_destination_file = os.path.join(secondary_destination,
+                                                  f"{scenario_long}_{topology}_cumulative_results.xlsx")
+        workbook.save(filename=secondary_destination_file)
