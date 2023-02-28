@@ -63,7 +63,7 @@ def solve_iv_curve(parameters, Geff, Tcell, ivcurve_pnts=1000):
     return np.array(I), np.array(V)
 
 
-def solve_cells(parameters, Geff, Tcell, ivcurve_pnts=1000):
+def solve_cells(parameters, Geff, Tcell, ivcurve_pnts=250):
     """
     Use De Soto and Bishop to simulate a full IV curve with both
     forward and reverse bias regions.
@@ -105,7 +105,7 @@ def solve_cells(parameters, Geff, Tcell, ivcurve_pnts=1000):
     return I / parameters['N_p_ideal'], V / parameters['N_s_ideal']
 
 
-def solve_subcells(evaluated_voltages, parameters, Geff, Tcell, ivcurve_pnts=1000):
+def solve_subcells(parameters, Geff, Tcell, ivcurve_pnts=250):
     # TODO make subcells work with N_p
     """
     Use De Soto and Bishop to simulate a full IV curve with both
@@ -120,6 +120,8 @@ def solve_subcells(evaluated_voltages, parameters, Geff, Tcell, ivcurve_pnts=100
     # sde_args has values:
     # (photocurrent, saturation_current, resistance_series, resistance_shunt, nNsVth)
     num_subcells = parameters['N_subcells']
+    n_subcell_ideal = 5
+
     sde_args = np.vectorize(pvsystem.calcparams_desoto)(Geff,
                                                         Tcell,
                                                         alpha_sc=parameters['alpha_sc'],
@@ -140,7 +142,13 @@ def solve_subcells(evaluated_voltages, parameters, Geff, Tcell, ivcurve_pnts=100
     i_subcell = []
     v_subcell = []
 
+    # evaluated_voltages = np.linspace(0.95 * parameters['breakdown_voltage'],
+    #                                  parameters['V_oc_ref'] * 1.05,
+    #                                  ivcurve_pnts)
+
+
     for n in range(0, num_subcells):
+        evaluated_voltages = utils.create_voltage_range(sde_args[:, n], kwargs, curve_pts=ivcurve_pnts)
         i_, v_, p_ = singlediode.bishop88(evaluated_voltages,
                                           *sde_args[:, n],
                                           **kwargs

@@ -819,7 +819,6 @@ def compile_system_single_core(module_dict, timeseries, tmy_location, dbt, psl, 
                                                       base_parameters, custom_module_data,
                                                       default_submodule_map, default_diode_map, default_subcell_map,
                                                       cell_type)
-
     # module_dict['DETAILS'].update({'para_keys':np.array(list(module_dict['PARAMETERS'].keys()))})
     # module_dict['DETAILS'].update({'para_values':np.array(list(module_dict['PARAMETERS'].values()))})
 
@@ -845,7 +844,12 @@ def compile_system_single_core(module_dict, timeseries, tmy_location, dbt, psl, 
         module_v_dict.update({hoy: np.round(Vmod, 5)})
         # Gmod is originally an array of W/m2 for each cell. Need to convert this array to W by multiply by cell area
         # then take the sum of irradiance for all the cells
-        Gmod = Gmod * module_dict['PARAMETERS']['one_subcell_area_m2']
+        if module_dict['PARAMETERS']['N_subcells'] > 1:
+            if module_dict['PARAMETERS']['orientation']=='portrait':
+                Gmod = np.mean(Gmod, axis=0)
+            else:
+                Gmod = np.mean(Gmod, axis=1)
+        Gmod = Gmod * module_dict['PARAMETERS']['one_cell_area_m2']
         module_g_dict.update({hoy: np.round(np.sum(Gmod), 1)})
 
     return module_i_dict, module_v_dict, module_g_dict, module_dict['PARAMETERS']
@@ -1018,5 +1022,5 @@ def build_module_features(module_dict, timeseries, tmy_location, dbt, psl, pv_ce
 
     for k, v in base_parameters.items():
         module_dict['PARAMETERS'].update({k: v})
-
+    module_dict['PARAMETERS']['test_param'] = 99
     return G_eff_ann, C_temp_ann_arr
