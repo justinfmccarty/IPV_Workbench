@@ -99,8 +99,8 @@ def run_building(project_folder, cell_technology, orientation, front_cover, buil
 
 def main():
     project_folder = r"C:\Users\Justin\Desktop\bano_project_folder"
-    year_list = [2020, 2080]
-    building_list = ["B1391", "B1389", "B1390", "B1360", "B1392", "B1393", "B1394", "B2494"]
+    year_list = [2020, 2050, 2080]
+    building_list = ["B1393"]# ["B1391", "B1389", "B1390", "B1360", "B1392", "B1393", "B1394", "B2494"]
     all_topologies = ['micro_inverter', 'string_inverter', 'central_inverter']
     log_file = os.path.join(project_folder, 'shared', 'resources', 'log_file.txt')
     hourly_resolution = 3  # run every N hours (interpolate between the results at the very end)
@@ -108,7 +108,7 @@ def main():
     for front_cover in ["solar_glass", "light_grey", "basic_white"]:
         for year in year_list:
             for cell_technology in ["A", "B", "C", "D"]:
-                for orientation in ["P", "L"]:
+                for orientation in ["P", "L"][0:1]:
 
 
                     # this is key (setting the scenario)
@@ -133,13 +133,16 @@ def main():
                                                                                       topology,
                                                                                       building_results_df_list)
                         print("Completed cumulative results.")
+                        device_fp = os.path.join(project_folder, "shared", "resources", "cell_module_data", "cell_module_datasheet.csv")
+                        custom_device_data = pd.read_csv(device_fp, index_col='scenario').loc[f"{cell_technology}{orientation}"].to_dict()
                         ipv_results.write_condensed_result(project_folder,
+                                                           custom_device_data,
                                                            building_results_df_list,
                                                            cumulative_df,
                                                            scenario,
                                                            topology,
-                                                           save_to_project=True,
-                                                           secondary_destination=r"C:\Users\Justin\Nextcloud\Teaching\22_HS\polikseni_bano\polikseni_share\condensed_simulation_results")
+                                                           save_to_project=False,
+                                                           secondary_destination=r"C:\Users\Justin\Nextcloud\Teaching\22_HS\polikseni_bano\polikseni_share\condensed_simulation_results\B1393_year_interpolation")
                         print("Completed condensing results.")
 
 
