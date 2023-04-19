@@ -22,6 +22,8 @@ def get_cell_type(module_template_cell):
         return "cigs"
     elif module_template_cell == "E":
         return "asi"
+    elif module_template_cell == "N":
+        return "nist"
 
 
 # map defintiions
@@ -46,6 +48,8 @@ def remap_module_maps(cell_type, parameters, default_diode_map, defaul_subcell_m
         remap_results = remap_subcell_cols(parameters, defaul_subcell_map)
     elif cell_type == 'asi':
         remap_results = remap_subcell_cols(parameters, defaul_subcell_map)
+    elif cell_type == 'nist':
+        remap_results = remap_polycrystalline(parameters, defaul_subcell_map)
     else:
         print("Current cell types are monocrystalline, polycrystalline, cigs, cdte, asi")
         remap_results = None

@@ -31,6 +31,16 @@ def account_for_film(direct_irrad, diffuse_irrad):
 #     return cell_tempreature
 
 def calculate_cell_temperature(G_effective, T_ambient, T_noct=45, Wind_speed=None, Pretrained_model=None, method="ross"):
+    """
+
+    :param G_effective:
+    :param T_ambient:
+    :param T_noct:
+    :param Wind_speed:
+    :param Pretrained_model:
+    :param method:
+    :return:
+    """
     if method == "ross_simple":
         return ross_temperature_correction_simple(G_effective, T_ambient)
     elif method == "ross":

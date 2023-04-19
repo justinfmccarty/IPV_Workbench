@@ -162,9 +162,9 @@ def front_cover_loss(irradiance, color):
     """
     Author: Justin McCarty
     Adapted from https://doi.org/10.1016/j.enbuild.2019.109623
-    P Reletive Loss in table 4, roughly mean reflectance across PV spectrum (mono)
+    P Relative Loss in Figure 4, roughly mean reflectance across PV spectrum (crystalline)
     :param irradiance: An irradiance value to be corrected
-    :param color: choose from the avaialble list...
+    :param color: choose from the available list...
         color         loss_factor
         gold          0.128
         purple        0.111

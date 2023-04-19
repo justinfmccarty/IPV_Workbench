@@ -4,8 +4,27 @@ import numpy as np
 from ipv_workbench.utilities import utils, circuits
 
 
-def plot_curves(i_arrs, v_arrs, module_params, labels='label', colors='k', title='title', linewidth=1, linestyle='solid', fs=(5, 3),
+def plot_curves(i_arrs, v_arrs, module_params, labels='label', colors='k', title=None, linewidth=1, linestyle='solid', fs=(5, 3),
                 bypass=False, y_max=None, x_min=None, save=None, reverse=True, mpp=False):
+    """
+    Plot the IV curve from the I and V arrays. Currently only works for one module type
+    :param i_arrs: current arrays (list of arrays or single array)
+    :param v_arrs: voltage arrays (list of arrays or single array)
+    :param module_params: a parameters dict for the module
+    :param labels: list of labels that matches the length if the I and V array inputs
+    :param colors: list of colors that matches the length if the I and V array inputs
+    :param title:
+    :param linewidth: list of linewidth that matches the length if the I and V array inputs
+    :param linestyle: list of linestyle that matches the length if the I and V array inputs
+    :param fs: size for the figure (tuple)
+    :param bypass: whether to use the BYpass diode function
+    :param y_max: set the plot y limit
+    :param x_min: set the plot x limit
+    :param save: either None or a file patht o save the figure
+    :param reverse:
+    :param mpp:
+    :return:
+    """
     # check for iterables
     if not isinstance(i_arrs, list):
         i_arrs = [i_arrs]
@@ -59,27 +78,32 @@ def plot_curves(i_arrs, v_arrs, module_params, labels='label', colors='k', title
         iv_right = df.plot('v', 'i', ax=axes[1], label=label, linewidth=lw, c=cl, linestyle=ls)
         if mpp == True:
             mpp_ = circuits.find_mpp(arr)
+            axes[1].scatter(mpp_[2], mpp_[1], c='red',alpha=0.5)
             if n + 1 == len(i_arrs):
                 # solves the duplicated MPP in legend
                 mpp_line_A = axes[1].hlines(y=mpp_[1],
                                             x1=0,
-                                            x2=np.max(arr[1]) * 10,
+                                            # x2=np.max(arr[1]) * 10,
+                                            x2=mpp_[2],
                                             color='red', alpha=0.5,
                                             label='MPP',
                                             linewidth=0.5, linestyle="dashed")
             else:
                 mpp_line_A = axes[1].hlines(y=mpp_[1],
                                             x1=0,
-                                            x2=np.max(arr[1]) * 10,
+                                            x2=mpp_[2],
+                                            # x2=np.max(arr[1]) * 10,
                                             color='red', alpha=0.5,
                                             linewidth=0.5, linestyle="dashed")
 
             mpp_line_V = axes[1].vlines(x=mpp_[2],
                                         y1=0,
-                                        y2=np.max(arr[0]) * 10,
+                                        y2=mpp_[1],
+                                        # y2=np.max(arr[0]) * 10,
                                         color='red', alpha=0.5,
                                         linewidth=0.5, linestyle="dashed")
             n += 1
+
 
     if np.min(v_min) * 1.25 == 0:
         axes[0].set_xlim([module_params['diode_threshold'] * 2, 0])
@@ -94,7 +118,7 @@ def plot_curves(i_arrs, v_arrs, module_params, labels='label', colors='k', title
         x_min = np.min(v_min) * 1.25
 
     axes[0].set_xlim([x_min, 0])
-    axes[1].set_xlim([0, np.max(v_max) * 1.25])
+    axes[1].set_xlim([0, np.max(v_max) * 1.05])
 
     axes[0].legend().set_visible(False)
     axes[1].legend().set_visible(False)
@@ -122,11 +146,11 @@ def plot_curves(i_arrs, v_arrs, module_params, labels='label', colors='k', title
     if labels[0] is None:
         pass
     else:
-        axes[1].legend(loc="upper left", facecolor="lightgrey",
-                       bbox_to_anchor=(1.02, 1),
+        axes[1].legend(loc="upper right", facecolor="lightgrey",
+                       # bbox_to_anchor=(1.02, 1),
                        ncol=1,
                        fancybox=False, shadow=False,
-                       borderaxespad=0,
+                       borderaxespad=1,
                        prop={'size': 6})
 
     if reverse == False:
@@ -140,3 +164,4 @@ def plot_curves(i_arrs, v_arrs, module_params, labels='label', colors='k', title
     pplt.show()
     fig.clear()
     pplt.close(fig)
+

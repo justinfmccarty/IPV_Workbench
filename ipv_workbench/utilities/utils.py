@@ -173,8 +173,13 @@ def find_matching_key(all_keys, conditions, search_irrad, search_temp):
 
 
 def read_pickle(file_path, read_method='rb'):
-    with open(file_path, read_method) as fp:
-        cucumber = pickle.load(fp)
+    extension = file_path.split(".")[-1]
+    if extension=='xz':
+        with lzma.open(file_path, read_method) as fp:
+            cucumber = pickle.load(fp)
+    else:
+        with open(file_path, read_method) as fp:
+            cucumber = pickle.load(fp)
     return cucumber
 
 def write_pickle(cucumber, file_path, write_method="wb", compress=False):
@@ -357,11 +362,20 @@ def create_sun_mask(file_path_sun_up_hours):
     return sun_up, sun_hours
 
 def build_full_ill(file_path_sun_up_hours, ill_df):
+    """
+
+    :param file_path_sun_up_hours: the path to the accompanying sun_up_hours.txt file
+    :param ill_df: either the .ill file read as a dataframe or the path to it
+    :return:
+    """
     if type(ill_df) is str:
         ill_df = pd.read_csv(ill_df, delimiter=' ', header=None).iloc[:, 1:].T.reset_index(drop=True)
     sun_up, sun_hours = create_sun_mask(file_path_sun_up_hours)
-    sun_ill = pd.concat([sun_hours, ill_df], axis=1)
-    irrad_df = pd.merge(sun_up, sun_ill, how="left", on="HOY").fillna(0)
+    # sun_ill = pd.concat([sun_hours, ill_df], axis=1)
+    # irrad_df = pd.merge(sun_up, sun_ill, how="left", on="HOY").fillna(0)
+
+    ill_df.set_index(pd.Series(sun_hours['HOY'].tolist()), inplace=True)
+    irrad_df = sun_up.join(ill_df)
     del irrad_df['Sunny']
     del irrad_df['HOY']
     return irrad_df

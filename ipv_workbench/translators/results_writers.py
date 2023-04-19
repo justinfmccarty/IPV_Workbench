@@ -5,6 +5,93 @@ import pandas as pd
 from ipv_workbench.utilities import utils, time_utils
 import openpyxl
 
+
+def write_building_results_simple_timeseries(po, scenario, topology):
+    year = scenario.split("_")[-1]
+    electricity_load = pd.read_csv(os.path.join(po.RESOURCES_DIR, "loads", "annual_building_demand_time_period.csv"))[
+        f"grid_demand_kwh_{year}"]
+    electricity_load_timeseries = electricity_load.values
+    # set result file
+    building_target_file = os.path.join(po.RESULTS_DIR, 'timeseries',
+                                        f"{scenario}_{topology}_building_level_results_hourly.csv")
+    utils.directory_creator(Path(building_target_file).parent)
+
+    results_dict = {}
+    results_dict.update({"electricity_demand_building_kwh": electricity_load_timeseries})
+
+    surface_results = []
+
+    for surface in po.get_surfaces():
+        surface_dict = po.get_dict_instance([surface])
+        surface_clean = utils.clean_grasshopper_key(surface)
+        general_dir = surface_dict['DETAILS']['general_angle']
+
+        # sum_results
+        surface_df = po.sum_simple_module_results(surface, topology)
+
+        surface_results.append(surface_df)
+
+        # generation
+        generation_surface_wh = surface_df['pmp'].values.flatten()
+        generation_surface_kwh = generation_surface_wh / 1000
+        results_dict.update({f"electricity_gen_bulk_{surface_clean}_{general_dir}_kwh": generation_surface_kwh})
+
+        # irradiance
+        irrad_surface_wh = surface_df['irrad'].values.flatten()
+        surface_irrad_kwh = irrad_surface_wh / 1000
+        results_dict.update({f"irrad_bulk_{surface_clean}_{general_dir}_kwh": surface_irrad_kwh})
+
+
+        # self sufficiency, consumption
+        self_suff, self_cons = utils.calc_self_sufficiency_consumption(electricity_load_timeseries,
+                                                                       generation_surface_kwh)
+        results_dict.update({f"self_sufficiency_{surface_clean}_{general_dir}_percent": self_suff})
+        results_dict.update({f"self_consumption_{surface_clean}_{general_dir}_percent": self_cons})
+
+
+        # area
+        surface_area = [np.max(surface_df['area'].values.flatten())] * len(surface_df['area'].values.flatten())
+        results_dict.update({f"surface_area_{surface_clean}_{general_dir}_m2": surface_area})
+
+        # gen intensity
+        surface_generation_intensity = generation_surface_kwh / surface_area
+        results_dict.update(
+            {f"electricity_gen_intensity_{surface_clean}_{general_dir}_kwh_m2": surface_generation_intensity})
+
+        # rad intensity
+        surface_irrad_intensity_kwh = surface_irrad_kwh / surface_area
+        results_dict.update({f"irrad_intensity_{surface_clean}_{general_dir}_kwh_m2": surface_irrad_intensity_kwh})
+
+
+        # index datetime
+        results_dict.update({"index": time_utils.hoy_to_date(np.arange(0, 8760, 1))})
+
+
+    all_surface_irrad = np.sum([df['irrad'].values for df in surface_results], axis=0) / 1000 # wh to kwh
+
+    results_dict.update({f"irrad_whole_building_kwh": np.round(all_surface_irrad,3)})
+
+    df = pd.DataFrame(results_dict).set_index("index").round(3)
+
+    sunup_df = df.iloc[po.sunup_array].interpolate()
+    sundown_df = df.iloc[po.sundown_array].fillna(0)
+
+    final_df = pd.concat([sunup_df, sundown_df]).sort_index()
+    final_df["electricity_demand_building_kwh"] = electricity_load_timeseries
+    all_surface_power = np.sum([df['pmp'].values for df in surface_results], axis=0) / 1000 # wh to kwh
+    final_df["electricity_gen_bulk_building_kwh"] = np.round(all_surface_power,3)
+    # self sufficiency, consumption
+    self_suff, self_cons = utils.calc_self_sufficiency_consumption(electricity_load_timeseries,
+                                                                   final_df["electricity_gen_bulk_building_kwh"].values)
+    final_df["self_sufficiency_building_percent"] = np.round(self_suff,3)
+    final_df["self_consumption_building_percent"] = np.round(self_cons,3)
+    final_df.fillna(0,inplace=True)
+    final_df.to_csv(building_target_file)
+
+    return building_target_file
+
+
+
 def write_building_results_timeseries(po, scenario, topology):
     year = scenario.split("_")[-1]
 
@@ -90,11 +177,11 @@ def write_building_results_timeseries(po, scenario, topology):
         # print(surface_efficiency.max())
         # surface_irrad_kwh = np.fromiter(surface_dict['YIELD'][topology]['irrad'].values(), dtype=float) / 1000
 
+        # irradiance
         surface_irrad_wh_series = pd.Series(surface_dict['YIELD'][topology]['irrad'])
         hoy_index = pd.Series(np.arange(0, 8760, 1), name='HOY')
         surface_irrad_wh_annual_df = pd.concat([hoy_index, surface_irrad_wh_series], axis=1)
         surface_irrad_kwh = surface_irrad_wh_annual_df[0].values / 1000
-
         surface_irrad.append(surface_irrad_kwh)
         results_dict.update({f"irrad_bulk_{surface_clean}_{general_dir}_kwh": surface_irrad_kwh})
 
@@ -175,6 +262,7 @@ def write_cumulative_scenario_results(project_folder, scenario, topology, bldg_r
     directions = [("_r", "roof_tops"), ("_west_", "west_facade"), ("_east_", "east_facade"),
                   ("_north_", "north_facade"), ("_south_", "south_facade")]
     for direction in directions:
+        # TODO edit the loop to check for the direction in the results so there is no nan
         # build col lists
         bulk_gen_buildings = []
         capacity_buildings = []
