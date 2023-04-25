@@ -448,8 +448,13 @@ def get_size(obj, seen=None):
 
 def log_run(file_path, write_string):
     #file_path = os.path.join(folder,"runtime.txt")
-    with open(file_path, "a") as fp:
-        fp.write(write_string)
+    if os.path.exists(file_path):
+        with open(file_path, "a") as fp:
+            fp.write(write_string)
+    else:
+        with open(file_path, "w+") as fp:
+            fp.write(write_string)
+
 
 
 def get_object_capacity(object_hourly_results):

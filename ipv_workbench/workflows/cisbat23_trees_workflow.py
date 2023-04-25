@@ -20,13 +20,13 @@ def run_configuration(project_folder, surface, building, direction, cell_technol
     raw_panelizer_file = format_raw_filename(cell_technology, orientation, front_cover, building)
 
     all_topologies = ['micro_inverter', 'string_inverter', 'central_inverter']
-    log_file = os.path.join(project_folder, direction, 'shared', 'resources', 'log_file.txt')
+    log_file = os.path.join(project_folder, 'shared', 'resources', 'log_file.txt')
 
     panelizer_object = panelizer.PanelizedObject(project_folder,
                                                  building,
                                                  raw_panelizer_file,
                                                  exclude_surfaces=["{8733;0;0}"],
-                                                 project_data=r"C:\Users\Justin\Nextcloud\Projects\12_CISBAT23_trees\panelizer_models\shared_data",
+                                                 project_data=r"/Users/jmccarty/Nextcloud/Projects/12_CISBAT23_trees/panelizer_models/shared_data",
                                                  contextual_scenario=context)
     custom_device_data = pd.read_csv(panelizer_object.module_cell_data,
                                      index_col='scenario').loc[f"{cell_technology}{orientation}"].to_dict()
@@ -40,12 +40,19 @@ def run_configuration(project_folder, surface, building, direction, cell_technol
     panelizer_object.hourly_resolution = resolution
     panelizer_object.set_analysis_period()
 
-
+    # skip results if they exist DEBUGGING ONLY
+    result_file_building = os.path.join(panelizer_object.RESULTS_DIR, 'timeseries',
+                                        f"{scenario}_central_inverter_building_level_results_hourly.csv")
+    if os.path.exists(result_file_building):
+        print("Result exists, skipping iteration")
+        # log_string = f"{config_string},0\n"
+        # utils.log_run(log_file, log_string)
+        return None
 
     # run the major simulation
     print("     Starting module solver...")
     solver_start = time.time()
-    panelizer.solve_object_module_iv(panelizer_object, mp=True)
+    panelizer.solve_object_module_iv(panelizer_object, display_print=False, mp=True)
     print(f"     Module IV solver finished in {round(time.time() - solver_start, 1)} seconds")
 
     # save the data
@@ -98,7 +105,7 @@ def main():
     all_context = ['all', 'close', 'near', 'none']
 
     for direction in all_directions:
-        project_folder = os.path.join(r"C:\Users\Justin\Nextcloud\Projects\12_CISBAT23_trees\panelizer_models",
+        project_folder = os.path.join(r"/Users/jmccarty/Nextcloud/Projects/12_CISBAT23_trees/panelizer_models",
                                       direction)
         for cell_tech in all_cell_tech:
             for orientation in all_orientations:

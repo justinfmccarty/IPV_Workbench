@@ -16,10 +16,9 @@ def load_irradiance_file(bldg_radiance_dir, rad_surface_key, component, contextu
     if os.path.exists(radiance_results_scenarios_dir):
         radiance_results_dir = os.path.join(radiance_results_scenarios_dir, contextual_scenario, "results")
 
-    component_results_dir = os.path.join("annual_irradiance", "results", f"{component}")
-    sun_up_path = os.path.join(radiance_results_dir, component_results_dir, "sun-up-hours.txt")
+    sun_up_path = os.path.join(radiance_results_dir, "annual_irradiance", "results", f"{component}", "sun-up-hours.txt")
     # print(os.path.join(radiance_results_dir, component_results_dir))
-    ill_path = glob.glob(os.path.join(radiance_results_dir, component_results_dir, "*.ill"))[0]
+    ill_path = glob.glob(os.path.join(radiance_results_dir, "annual_irradiance", "results", f"{component}", "*.ill"))[0]
     ill_df = utils.build_full_ill(sun_up_path, ill_path)
     ill_df.sort_index(inplace=True)
     return ill_df

@@ -209,10 +209,10 @@ def write_building_results_timeseries(po, scenario, topology):
     sunup_array_sorted = np.sort(po.sunup_array)
     sundown_array_sorted = np.sort(po.sundown_array)
 
-    sunup_df = df.iloc[sunup_array_sorted]
+    sunup_df = df.iloc[sunup_array_sorted].copy()
     sunup_df.replace(0, np.nan, inplace=True)
     sunup_df = sunup_df.interpolate().bfill().ffill()
-    sundown_df = df.iloc[sundown_array_sorted].fillna(0)
+    sundown_df = df.iloc[sundown_array_sorted].fillna(0).copy()
 
     final_df = pd.concat([sunup_df, sundown_df]).sort_index()
     final_df["electricity_demand_building_kwh"] = electricity_load_timeseries
