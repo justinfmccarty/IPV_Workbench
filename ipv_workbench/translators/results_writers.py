@@ -48,7 +48,6 @@ def write_building_results_simple_timeseries(po, scenario, topology):
         results_dict.update({f"self_sufficiency_{surface_clean}_{general_dir}_percent": self_suff})
         results_dict.update({f"self_consumption_{surface_clean}_{general_dir}_percent": self_cons})
 
-
         # area
         surface_area = [np.max(surface_df['area'].values.flatten())] * len(surface_df['area'].values.flatten())
         results_dict.update({f"surface_area_{surface_clean}_{general_dir}_m2": surface_area})
@@ -73,8 +72,13 @@ def write_building_results_simple_timeseries(po, scenario, topology):
 
     df = pd.DataFrame(results_dict).set_index("index").round(3)
 
-    sunup_df = df.iloc[po.sunup_array].interpolate()
-    sundown_df = df.iloc[po.sundown_array].fillna(0)
+    sunup_array_sorted = np.sort(po.sunup_array)
+    sundown_array_sorted = np.sort(po.sundown_array)
+
+    sunup_df = df.iloc[sunup_array_sorted]
+    sunup_df.replace(0, np.nan, inplace=True)
+    sunup_df = sunup_df.interpolate().bfill().ffill()
+    sundown_df = df.iloc[sundown_array_sorted].fillna(0)
 
     final_df = pd.concat([sunup_df, sundown_df]).sort_index()
     final_df["electricity_demand_building_kwh"] = electricity_load_timeseries
@@ -156,6 +160,7 @@ def write_building_results_timeseries(po, scenario, topology):
         surface_area = surface_dict['DETAILS']['installed_area_m2']
         results_dict.update({f"surface_area_{surface_clean}_{general_dir}_m2": [surface_area] * len(generation_surface_kwh)})
 
+        # specific yield
         surface_specific_yield = generation_surface_kwh / surface_capacity_kw
         results_dict.update(
             {f"electricity_specific_yield_{surface_clean}_{general_dir}_kwh_kwp": surface_specific_yield})
@@ -201,8 +206,13 @@ def write_building_results_timeseries(po, scenario, topology):
     results_dict.update({f"irrad_whole_building_kwh": np.sum(surface_irrad,axis=0)})
     df = pd.DataFrame(results_dict).set_index("index").round(3)
 
-    sunup_df = df.iloc[po.sunup_array].interpolate()
-    sundown_df = df.iloc[po.sundown_array].fillna(0)
+    sunup_array_sorted = np.sort(po.sunup_array)
+    sundown_array_sorted = np.sort(po.sundown_array)
+
+    sunup_df = df.iloc[sunup_array_sorted]
+    sunup_df.replace(0, np.nan, inplace=True)
+    sunup_df = sunup_df.interpolate().bfill().ffill()
+    sundown_df = df.iloc[sundown_array_sorted].fillna(0)
 
     final_df = pd.concat([sunup_df, sundown_df]).sort_index()
     final_df["electricity_demand_building_kwh"] = electricity_load_timeseries

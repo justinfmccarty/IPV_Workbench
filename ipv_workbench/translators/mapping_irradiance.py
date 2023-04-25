@@ -1,42 +1,37 @@
 # coding=utf-8
-import datetime
-import math
 import os
 from ipv_workbench.utilities import utils
 from ipv_workbench.utilities import time_utils
 import numpy as np
-import matplotlib.pyplot as plt
 import pandas as pd
 import pvlib
 from scipy.spatial.distance import cdist
 import glob
 
-"""
-This script will allow to consider the angle of incidence correction for modules.
 
-Idea:   The direct-direct sunlight on a sensor point has a certain incidence angle. This angle shall
-        be calculated from the time and the sensor point normal vector. To correctly get the sun angles
-        the longitude and latitude as well as the elevation are needed.
-
-        With the angle a correction according to the module properties are carried out for diffuse and direct
-        irradiation. In the end the two components are added and then represent the irradiation on the 
-        cells after the glass or module TCO
-
-@author: Linus Walker
-"""
-
-
-def load_irradiance_file(bldg_radiance_dir, rad_surface_key, component):
+def load_irradiance_file(bldg_radiance_dir, rad_surface_key, component, contextual_scenario=None):
     radiance_results_dir = os.path.join(bldg_radiance_dir, f"surface_{rad_surface_key}", "results")
+    radiance_results_scenarios_dir = os.path.join(bldg_radiance_dir, f"surface_{rad_surface_key}", "scenario_results")
+
+    if os.path.exists(radiance_results_scenarios_dir):
+        radiance_results_dir = os.path.join(radiance_results_scenarios_dir, contextual_scenario, "results")
+
     component_results_dir = os.path.join("annual_irradiance", "results", f"{component}")
     sun_up_path = os.path.join(radiance_results_dir, component_results_dir, "sun-up-hours.txt")
     # print(os.path.join(radiance_results_dir, component_results_dir))
     ill_path = glob.glob(os.path.join(radiance_results_dir, component_results_dir, "*.ill"))[0]
-    return utils.build_full_ill(sun_up_path, ill_path)
+    ill_df = utils.build_full_ill(sun_up_path, ill_path)
+    ill_df.sort_index(inplace=True)
+    return ill_df
 
 
-def load_grid_file(bldg_radiance_dir, rad_surface_key):
+def load_grid_file(bldg_radiance_dir, rad_surface_key, contextual_scenario):
     radiance_results_dir = os.path.join(bldg_radiance_dir, f"surface_{rad_surface_key}", "results")
+    radiance_results_scenarios_dir = os.path.join(bldg_radiance_dir, f"surface_{rad_surface_key}", "scenario_results")
+
+    if os.path.exists(radiance_results_scenarios_dir):
+        radiance_results_dir = os.path.join(radiance_results_scenarios_dir, contextual_scenario, "results")
+
     pts_path = glob.glob(os.path.join(radiance_results_dir, "annual_irradiance", "model", "grid", "*.pts"))[0]
     return pd.read_csv(pts_path, delimiter=" ", header=None, names=["X", "Y", "Z", "X_v", "Y_v", "Z_v"])
 
@@ -47,23 +42,25 @@ def collect_raw_irradiance(pv_cells_xyz_arr, sensor_pts_xyz_arr, sensor_pts_irra
     # print("Sensor XYZ", sensor_pts_xyz_arr.shape)
     # print("Sensor irrad", sensor_pts_irradiance_arr.shape)
     cdist_arr = cdist(pv_cells_xyz_arr, sensor_pts_xyz_arr)
-    first = cdist_arr.argsort()[:,0]
-    second = cdist_arr.argsort()[:,1]
-    third = cdist_arr.argsort()[:,2]
+    first = cdist_arr.argsort()[:, 0]
+    second = cdist_arr.argsort()[:, 1]
+    third = cdist_arr.argsort()[:, 2]
     # print(cdist_arr[:, 0].shape)
 
-    irrad_cell_mean = (sensor_pts_irradiance_arr.T[first] + sensor_pts_irradiance_arr.T[second] + sensor_pts_irradiance_arr.T[third]) / 3
+    irrad_cell_mean = (sensor_pts_irradiance_arr.T[first] + sensor_pts_irradiance_arr.T[second] +
+                       sensor_pts_irradiance_arr.T[third]) / 3
     return irrad_cell_mean.T
-
 
 
 def load_sensor_points(sensor_file):
     return pd.read_csv(sensor_file, sep=' ', header=None, names=['x', 'y', 'z', 'xdir', 'ydir', 'zdir'])
 
+
 def load_irrad_data(irrad_complete_path, irrad_direct_path):
     irrad_complete = pd.read_csv(irrad_complete_path, delimiter=' ', header=None).iloc[:, 1:].T.reset_index(drop=True)
     irrad_dir_dir = pd.read_csv(irrad_direct_path, delimiter=' ', header=None).iloc[:, 1:].T.reset_index(drop=True)
     return irrad_complete, irrad_dir_dir
+
 
 def angle_between_vectors(vector1, vector2):
     """
@@ -89,7 +86,7 @@ def vector_to_tilt_and_azimuth(avector):
     :param avector:
     :return:
     """
-    #TODO modifiy this to take an array and return an array in case of non-planar module
+    # TODO modifiy this to take an array and return an array in case of non-planar module
     if avector[0] == 0 and avector[1] == 0:
         tilt = 0
         azimuth = 0  # technically this is wrong
@@ -111,6 +108,7 @@ def vector_to_tilt_and_azimuth(avector):
         else:
             azimuth = 2 * np.pi - (np.arctan(-avector[0] / avector[1]))
     return azimuth, tilt
+
 
 #
 # # inputs in radians
@@ -134,7 +132,7 @@ def k_martin_ruiz(theta_m, aa_r):
     #     k = np.exp(1 / aa_r) * (1 - np.exp(-np.cos(theta_m) / aa_r)) / (np.exp(1 / aa_r) - 1)
     #     return k
     k = np.where(theta_m > np.pi / 2, 0,
-             np.exp(1 / aa_r) * (1 - np.exp(-np.cos(theta_m) / aa_r)) / (np.exp(1 / aa_r) - 1))
+                 np.exp(1 / aa_r) * (1 - np.exp(-np.cos(theta_m) / aa_r)) / (np.exp(1 / aa_r) - 1))
     return k
 
 
@@ -178,7 +176,7 @@ def front_cover_loss(irradiance, color):
     """
     table_filepath = os.path.join(os.path.dirname(__file__), "../solver/front_cover_loss_table.csv")
     if os.path.exists(table_filepath):
-        loss_table = pd.read_csv(table_filepath,index_col='Unnamed: 0')
+        loss_table = pd.read_csv(table_filepath, index_col='Unnamed: 0')
     else:
         default_colors = ["gold", "purple", "pure_white", "basic_white", "medium_green", "terracotta", "dark_green",
                           "light_grey"]
@@ -189,7 +187,9 @@ def front_cover_loss(irradiance, color):
     loss_factor = loss_table.loc[color]
     return irradiance * (1 - loss_factor).values
 
-def calculate_effective_irradiance_single_step(G_dir, G_diff, evaluated_normal_vector, hoy, tmy_location, pressure, drybulb, front_cover_color="clear"):
+
+def calculate_effective_irradiance_single_step(G_dir, G_diff, evaluated_normal_vector, hoy, tmy_location, pressure,
+                                               drybulb, front_cover_color="clear"):
     """
     Author: Justin McCarty
     :param G_dir:
@@ -203,7 +203,7 @@ def calculate_effective_irradiance_single_step(G_dir, G_diff, evaluated_normal_v
     :return:
     """
     # part 1: account for front cover loss
-    if front_cover_color=='clear':
+    if front_cover_color == 'clear':
         G_eff_dir = G_dir
         G_eff_diff = G_diff
     else:
@@ -231,6 +231,7 @@ def calculate_effective_irradiance_single_step(G_dir, G_diff, evaluated_normal_v
     aoi_mod_rad = np.deg2rad(aoi_mod_deg)
     return calc_angular_loss_martin_ruiz(G_eff_dir, G_eff_diff, aoi_mod_rad, a_r=0.17)
 
+
 def calculate_effective_irradiance_timeseries(G_dir, G_diff, evaluated_normal_vector, hoy,
                                               tmy_location, pressure, drybulb, front_cover_color="clear"):
     """
@@ -246,7 +247,7 @@ def calculate_effective_irradiance_timeseries(G_dir, G_diff, evaluated_normal_ve
     :return:
     """
     # part 1: account for front cover loss
-    if front_cover_color=='clear':
+    if front_cover_color == 'clear':
         G_eff_dir = G_dir
         G_eff_diff = G_diff
     else:
@@ -274,8 +275,6 @@ def calculate_effective_irradiance_timeseries(G_dir, G_diff, evaluated_normal_ve
 
     aoi_mod_deg = pvlib.irradiance.aoi(surface_tilt_deg, surface_azimuth_deg, solar_zenith_deg, solar_azimuth_deg)
     # need to add an additional dimension for broadcasting against the irradiance arrays
-    aoi_mod_rad = np.deg2rad(aoi_mod_deg).reshape((aoi_mod_deg.shape[0],-1))
+    aoi_mod_rad = np.deg2rad(aoi_mod_deg).reshape((aoi_mod_deg.shape[0], -1))
     angular_loss = calc_angular_loss_martin_ruiz(G_eff_dir, G_eff_diff, aoi_mod_rad, a_r=0.17)
     return angular_loss
-
-

@@ -9,13 +9,12 @@ import pandas as pd
 from operator import itemgetter
 import os
 import pvlib
-import copy
 
 def directory_creator(dir_path):
     if os.path.exists(dir_path):
         pass
     else:
-        os.mkdir(dir_path)
+        os.makedirs(dir_path)
 
 def ts_8760(year=2022):
     index = pd.date_range(start=f"01-01-{year} 00:00", end=f"12-31-{year} 23:00", freq="h")
