@@ -45,7 +45,7 @@ def run_configuration(project_folder, surface, building, direction, cell_technol
                                         f"{scenario}_central_inverter_building_level_results_hourly.csv")
     if os.path.exists(result_file_building):
         print("Result exists, skipping iteration")
-        log_string = f"{config_string},0\n"
+        log_string = f"{time.ctime()},{config_string},0\n"
         utils.log_run(log_file, log_string)
         return None
 
@@ -90,7 +90,7 @@ def run_configuration(project_folder, surface, building, direction, cell_technol
 
     end_time = time.time()
     run_time = end_time - solver_start
-    log_string = f"{config_string},{np.round(run_time, 3)}\n"
+    log_string = f"{time.ctime()},{config_string},{np.round(run_time, 3)}\n"
     utils.log_run(log_file, log_string)
     print(f"    {building}, {scenario} completed in {round(run_time, 1)} seconds.")
 
@@ -99,7 +99,7 @@ def main():
     building = 'B8733'
     surface = '{8733;0;8}'
 
-    all_directions = ['west', 'south', 'east']
+    all_directions = ['west', 'south']
     all_cell_tech = ['A', 'B', 'C', 'D']
     all_orientations = ['P', 'L']
     all_context = ['all', 'close', 'near', 'none']

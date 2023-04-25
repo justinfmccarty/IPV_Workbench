@@ -951,7 +951,6 @@ def solve_object_module_iv(panelizer_object, write_system=False, mp=False, displ
 
         # load radiance data
         rad_surface_key = panelizer_object.get_dict_instance([surface])['DETAILS']['radiance_surface_label']
-        print(os.path.join(panelizer_object.RADIANCE_DIR, f"surface_{rad_surface_key}", "results"))
         total_ill = ipv_irrad.load_irradiance_file(panelizer_object.RADIANCE_DIR, rad_surface_key, "total",
                                                    panelizer_object.contextual_scenario).values[
             timeseries]
