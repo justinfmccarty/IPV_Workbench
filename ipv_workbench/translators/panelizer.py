@@ -15,7 +15,8 @@ import glob
 
 
 class PanelizedObject:
-    def __init__(self, project_folder, object_name, raw_panelizer, exclude_surfaces=None, project_data=None, contextual_scenario=None):
+    def __init__(self, project_folder, object_name, raw_panelizer, exclude_surfaces=None, project_data=None,
+                 contextual_scenario=None):
 
         self.object_name = object_name
         self.raw_panelizer = raw_panelizer
@@ -40,7 +41,6 @@ class PanelizedObject:
         self.analysis_year = None
         self.hourly_resolution = None
 
-
     def project_setup(self):
         self.PROJECT_DIR = self.project_folder
 
@@ -62,7 +62,7 @@ class PanelizedObject:
         self.COLD_DIR = os.path.join(self.OBJECT_DIR, "cold_storage")
 
         utils.directory_creator(self.COLD_DIR)
-        if self.contextual_scenario==None:
+        if self.contextual_scenario == None:
             scenario_name = 'base'
         else:
             scenario_name = self.contextual_scenario
@@ -115,7 +115,7 @@ class PanelizedObject:
         self.MAPS_DIR = os.path.join(self.MODULE_CELL_DIR, "map_files")
         utils.directory_creator(self.MAPS_DIR)
         self.map_files = glob.glob(os.path.join(self.MAPS_DIR, "*.xls*"))
-        if len(self.map_files)>0:
+        if len(self.map_files) > 0:
             pass
         else:
             library_root = pathlib.Path(__file__).parent.parent
@@ -128,20 +128,19 @@ class PanelizedObject:
         src_load_data = os.path.join(self.project_data, "annual_building_demand_time_period.csv")
         shutil.copy2(src=src_load_data, dst=self.LOADS_DIR)
 
-
     def find_sun_file(self):
-        srf_dir = glob.glob(os.path.join(self.RADIANCE_DIR,"surface_*"))[0]
-        results_dir = glob.glob(os.path.join(srf_dir,"*results*"))[0]
+        srf_dir = glob.glob(os.path.join(self.RADIANCE_DIR, "surface_*"))[0]
+        results_dir = glob.glob(os.path.join(srf_dir, "*results*"))[0]
         if "scenario" in results_dir.split(os.sep)[-1]:
             scen_dirs = glob.glob(os.path.join(results_dir, "*"))
             scen_dir_one = scen_dirs[0]
             src_sun_file = os.path.join(scen_dir_one, "results", "annual_irradiance", "results", "total",
-                                    "sun-up-hours.txt")
+                                        "sun-up-hours.txt")
             os.makedirs(os.path.dirname(self.SUN_UP_FILE), exist_ok=False)
             shutil.copy2(src_sun_file, self.SUN_UP_FILE)
         else:
             src_sun_file = os.path.join(results_dir, "annual_irradiance", "results", "total",
-                                    "sun-up-hours.txt")
+                                        "sun-up-hours.txt")
             os.makedirs(os.path.dirname(self.SUN_UP_FILE), exist_ok=False)
             shutil.copy2(src_sun_file, self.SUN_UP_FILE)
 
@@ -208,12 +207,11 @@ class PanelizedObject:
     #     return self.get_dict_instance([surface])['RESULTSDICT']
 
     def get_surfaces(self):
-        if self.exclude_surfaces==None:
+        if self.exclude_surfaces == None:
             self.active_surfaces = list(self.panelizer_dict[self.object_type]['SURFACES'].keys())
         else:
             active_surfaces_temp = list(self.panelizer_dict[self.object_type]['SURFACES'].keys())
             self.active_surfaces = [srf for srf in active_surfaces_temp if srf not in self.exclude_surfaces]
-
         return self.active_surfaces
 
     def get_strings(self, surface_name):
@@ -300,8 +298,9 @@ class PanelizedObject:
 
         rad_surface_key = self.get_dict_instance([surface])['DETAILS']['radiance_surface_label']
         total_ill = \
-        ipv_irrad.load_irradiance_file(self.RADIANCE_DIR, rad_surface_key, "total", self.contextual_scenario).values[
-            self.all_hoy]
+            ipv_irrad.load_irradiance_file(self.RADIANCE_DIR, rad_surface_key, "total",
+                                           self.contextual_scenario).values[
+                self.all_hoy]
         direct_ill = \
             ipv_irrad.load_irradiance_file(self.RADIANCE_DIR, rad_surface_key, "direct",
                                            self.contextual_scenario).values[
@@ -366,8 +365,9 @@ class PanelizedObject:
 
         rad_surface_key = self.get_dict_instance([surface])['DETAILS']['radiance_surface_label']
         total_ill = \
-        ipv_irrad.load_irradiance_file(self.RADIANCE_DIR, rad_surface_key, "total", self.contextual_scenario).values[
-            self.all_hoy]
+            ipv_irrad.load_irradiance_file(self.RADIANCE_DIR, rad_surface_key, "total",
+                                           self.contextual_scenario).values[
+                self.all_hoy]
         direct_ill = \
             ipv_irrad.load_irradiance_file(self.RADIANCE_DIR, rad_surface_key, "direct",
                                            self.contextual_scenario).values[
@@ -1025,7 +1025,7 @@ def solve_object_module_iv(panelizer_object, write_system=False, mp=False, displ
                     print(f"        Processing string {string} across the module list of length {len(modules)}")
 
                 module_start = time.time()
-                compile_mp.main(panelizer_object, surface, string, tmy_location, dbt, psl, grid_pts, direct_ill,
+                compile_mp.main_v2(panelizer_object, surface, string, tmy_location, dbt, psl, grid_pts, direct_ill,
                                 diffuse_ill)
                 module_end = time.time()
                 if display_print == True:
@@ -1228,6 +1228,116 @@ def build_module_features(module_dict, timeseries, tmy_location, dbt, psl, pv_ce
     # orientation = ipv_mm.get_orientation(module_template[1])
     # map_file = [fp for fp in map_files if f"{cell_type}_{orientation}" in fp][0]
     # default_submodule_map, default_diode_map, default_subcell_map = utils.read_map_excel(map_file)
+
+    if ipv_mm.detect_nonstandard_module(module_dict) == 'standard':
+        module_dict['MAPS']['SUBMODULES'] = default_submodule_map
+        module_dict['MAPS']['DIODES'] = default_diode_map
+        module_dict['MAPS']['SUBCELLS'] = default_subcell_map
+    else:
+        remap_results = ipv_mm.remap_module_maps(cell_type,
+                                                 device_parameters,
+                                                 default_diode_map,
+                                                 default_subcell_map)
+        module_dict['MAPS']['SUBMODULES'] = remap_results[0]
+        module_dict['MAPS']['DIODES'] = remap_results[1]
+        module_dict['MAPS']['SUBCELLS'] = remap_results[2]
+        device_parameters['N_s'] = remap_results[3]
+        device_parameters['N_p'] = remap_results[4]
+        device_parameters['N_diodes'] = remap_results[4]
+        device_parameters['N_subcells'] = remap_results[6]
+
+    for k, v in device_parameters.items():
+        module_dict['PARAMETERS'].update({k: v})
+
+    return G_eff_ann, C_temp_ann_arr
+
+
+def compile_system_multi_core_v2(module_dict_chunk, module_name_chunk, timeseries, G_eff_ann_chunk, dbt,
+                                 base_parameters, custom_module_data, default_submodule_map, default_diode_map,
+                                 default_subcell_map, cell_type):
+    module_results = {}
+
+    for n, module_dict in enumerate(module_dict_chunk):
+        module_name = module_name_chunk[n]
+        G_eff_ann = G_eff_ann_chunk[n]
+        Imod, Vmod, Gmod, module_parameters = compile_system_single_core_v2(module_dict, timeseries,
+                                                                            dbt, G_eff_ann,
+                                                                            base_parameters,
+                                                                            custom_module_data,
+                                                                            default_submodule_map,
+                                                                            default_diode_map,
+                                                                            default_subcell_map,
+                                                                            cell_type)
+
+        module_results.update({module_name: [Imod, Vmod, Gmod, module_parameters]})
+
+    return module_results
+
+
+def compile_system_single_core_v2(module_dict, timeseries, dbt, G_eff_ann,
+                                  base_parameters, custom_module_data, default_submodule_map,
+                                  default_diode_map, default_subcell_map, cell_type):
+    G_eff_ann, C_temp_ann_arr = build_module_features_v2(module_dict, timeseries, dbt, G_eff_ann,
+                                                         base_parameters, custom_module_data,
+                                                         default_submodule_map, default_diode_map, default_subcell_map,
+                                                         cell_type)
+
+    module_i_dict = {}
+    module_v_dict = {}
+    module_g_dict = {}
+    for hoy_n, hoy in enumerate(timeseries):
+        Gmod = G_eff_ann[hoy_n]  # panelizer_object.get_cells_irrad_eff(surface, string, module)[hoy]
+        Tmod = C_temp_ann_arr[hoy_n]  # panelizer_object.get_cells_temp(surface, string, module)[hoy]
+        if np.sum(Gmod < module_dict['PARAMETERS']['minimum_irradiance_cell']) > 0:
+            # Gmod_total = np.sum(Gmod.flatten()*module_dict['PARAMETERS']['one_cell_area_m2']) / module_dict['PARAMETERS']['actual_module_area_m2']
+            # if Gmod_total < module_dict['PARAMETERS']['minimum_irradiance_module']
+
+            # print(hoy_n, hoy, time_utils.hoy_to_date(hoy), "Zero Array", np.sum(Gmod))
+            Imod, Vmod = (np.zeros(303), np.zeros(303))
+        else:
+            Imod, Vmod = ipv_calc.calculate_module_map_dependent(Gmod,
+                                                                 Tmod,
+                                                                 module_dict,
+                                                                 ivcurve_pnts=500)
+
+        module_i_dict.update({hoy: np.round(Imod, 5)})
+        module_v_dict.update({hoy: np.round(Vmod, 5)})
+
+        # Gmod is originally an array of W/m2 for each cell. Need to convert this array to W by multiply by cell area
+        # then take the sum of irradiance for all the cells
+        if module_dict['PARAMETERS']['N_subcells'] > 1:
+            if module_dict['PARAMETERS']['orientation'] == 'portrait':
+                Gmod = np.mean(Gmod, axis=0)
+            else:
+                Gmod = np.mean(Gmod, axis=1)
+        else:
+            pass
+        Gmod = Gmod * module_dict['PARAMETERS']['one_cell_area_m2']
+        module_g_dict.update({hoy: np.round(np.sum(Gmod), 1)})
+
+    return module_i_dict, module_v_dict, module_g_dict, module_dict['PARAMETERS']
+
+
+def build_module_features_v2(module_dict, timeseries, dbt, G_eff_ann,
+                             base_parameters, custom_module_data, default_submodule_map, default_diode_map,
+                             default_subcell_map, cell_type):
+    device_parameters = devices.build_parameter_dict(module_dict, custom_module_data, base_parameters)
+
+    # nrows will always be 1 in cdte portrait now due to the changes in grasshopper. this may cause problem
+    ncols = device_parameters['n_cols']
+    nrows = device_parameters['n_rows']
+
+    hoy_arrs = []
+    for hoy_n in np.arange(0, len(timeseries)):
+        G_eff_hoy_arr = np.round(np.fliplr(G_eff_ann[hoy_n].reshape(-1, nrows)).T, 2)
+        hoy_arrs.append(G_eff_hoy_arr)
+
+    G_eff_ann = np.array(hoy_arrs)
+
+    # calculate cell temperature
+    C_temp_ann_arr = ipv_calc.calculate_cell_temperature(G_eff_ann,
+                                                         dbt[:, None, None],
+                                                         method="ross")
 
     if ipv_mm.detect_nonstandard_module(module_dict) == 'standard':
         module_dict['MAPS']['SUBMODULES'] = default_submodule_map

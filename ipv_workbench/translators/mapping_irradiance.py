@@ -277,3 +277,35 @@ def calculate_effective_irradiance_timeseries(G_dir, G_diff, evaluated_normal_ve
     aoi_mod_rad = np.deg2rad(aoi_mod_deg).reshape((aoi_mod_deg.shape[0], -1))
     angular_loss = calc_angular_loss_martin_ruiz(G_eff_dir, G_eff_diff, aoi_mod_rad, a_r=0.17)
     return angular_loss
+
+
+def get_effective_module_irradiance(panelizer_object, surface, string, module_name, sensor_pts_xyz_arr,
+                                    direct_ill, diffuse_ill):
+    module_dict = panelizer_object.get_dict_instance([surface, string, module_name])
+    module_normal = tuple(module_dict['CELLSNORMALS'][0])
+    front_cover = module_dict['LAYERS']['front_film']
+    tmy_location = utils.tmy_location(panelizer_object.tmy_file)
+    timeseries = panelizer_object.all_hoy
+    dbt = panelizer_object.tmy_dataframe['drybulb_C'].values[timeseries]
+    psl = panelizer_object.tmy_dataframe['atmos_Pa'].values[timeseries]
+
+    pv_cells_xyz_arr = panelizer_object.get_cells_xyz(surface, string, module_name)
+    if len(pv_cells_xyz_arr.shape) > 2:
+        pv_cells_xyz_arr = pv_cells_xyz_arr[0]
+
+    G_dir_ann = collect_raw_irradiance(pv_cells_xyz_arr,
+                                       sensor_pts_xyz_arr,
+                                       direct_ill)  # .values)
+    G_diff_ann = collect_raw_irradiance(pv_cells_xyz_arr,
+                                        sensor_pts_xyz_arr,
+                                        diffuse_ill)  # .values)
+
+    G_eff_ann = calculate_effective_irradiance_timeseries(G_dir_ann,
+                                                          G_diff_ann,
+                                                          module_normal,
+                                                          timeseries,
+                                                          tmy_location,
+                                                          psl,
+                                                          dbt,
+                                                          front_cover)
+    return G_eff_ann
