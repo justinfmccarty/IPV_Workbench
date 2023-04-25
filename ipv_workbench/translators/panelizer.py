@@ -961,7 +961,8 @@ def solve_object_module_iv(panelizer_object, write_system=False, mp=False, displ
 
         grid_pts = ipv_irrad.load_grid_file(panelizer_object.RADIANCE_DIR, rad_surface_key,
                                             panelizer_object.contextual_scenario)
-
+        if display_print == True:
+            print("Completed loading grid and irradiance data.")
         for string in panelizer_object.get_strings(surface):
             if display_print == True:
                 print("     -------------------")

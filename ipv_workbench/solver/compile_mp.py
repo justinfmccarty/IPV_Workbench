@@ -74,6 +74,6 @@ def main(panelizer_object, surface, string, tmy_location, dbt, psl, grid_pts, di
     utils.unpack_mp_results(mp_results, panelizer_object, surface, string, modules, timeseries)
 
 
-
-if __name__=="__main__":
-    main(panelizer_object, surface, string, tmy_location, dbt, psl, grid_pts, direct_ill, diffuse_ill)
+#
+# if __name__=="__main__":
+#     main(panelizer_object, surface, string, tmy_location, dbt, psl, grid_pts, direct_ill, diffuse_ill)
