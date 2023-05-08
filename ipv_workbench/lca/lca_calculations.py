@@ -12,26 +12,24 @@ GWP:
 import numpy as np
 
 
-def calculate_module_gwp(module):
-    cell_type = module.cell_type
+def calculate_module_gwp(cell_type, area):
 
     if cell_type=='monocrystalline':
-        module_gwp = module.area * 250
+        module_gwp = area * 245.82 #kg Co2e per m2
     elif cell_type == 'polycrystalline':
-        module_gwp = module.area * 175
+        module_gwp = area * 202.41
     elif cell_type == 'cdte':
-        module_gwp = module.area * 115
+        module_gwp = area * 58.9
     elif cell_type == 'cigs':
-        module_gwp = module.area * 110
+        module_gwp = area * 68.9
     elif cell_type == 'asi':
-        module_gwp = module.area * 125
+        module_gwp = area * 125
     elif cell_type == 'dssc':
-        module_gwp = module.area * 50
+        module_gwp = area * 50
     else:
         module_gwp = 0
 
     return module_gwp
-
 
 def module_projected_output(production_values, lifetime, max_performance=97, annual_factor=0.54, min_performance=80):
     derate_factors = np.linspace(max_performance,
@@ -41,6 +39,15 @@ def module_projected_output(production_values, lifetime, max_performance=97, ann
     lifetime_production = production_values * derate_factors
     return lifetime_production
 
+def calculate_inverter_embodied(topology, array_capacity):
+    if topology == 'central_inverter':
+        inverter_gwp = array_capacity * 28.0 # kgCO2e per kWp
+    elif topology == 'string_inverter':
+        inverter_gwp = array_capacity * 95.9
+    elif topology == 'micro_inverter':
+        inverter_gwp = array_capacity * 96.8
+    else:
+        inverter_gwp = 0
 
-
+    return inverter_gwp
 

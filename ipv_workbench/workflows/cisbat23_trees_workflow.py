@@ -26,7 +26,7 @@ def run_configuration(project_folder, surface, building, direction, cell_technol
                                                  building,
                                                  raw_panelizer_file,
                                                  exclude_surfaces=["{8733;0;0}"],
-                                                 project_data=r"C:\Users\Justin\Nextcloud\Projects\12_CISBAT23_trees\panelizer_models\shared_data",
+                                                 project_data=r"/Users/jmccarty/Nextcloud/Projects/12_CISBAT23_trees/panelizer_models/shared_data",
                                                  contextual_scenario=context)
     custom_device_data = pd.read_csv(panelizer_object.module_cell_data,
                                      index_col='scenario').loc[f"{cell_technology}{orientation}"].to_dict()
@@ -99,13 +99,13 @@ def main():
     building = 'B8733'
     surface = '{8733;0;8}'
 
-    all_directions = ['west', 'south']
-    all_cell_tech = ['A', 'B', 'C', 'D']
-    all_orientations = ['P', 'L']
-    all_context = ['all', 'close', 'near', 'none']
+    all_directions = ['west']
+    all_cell_tech = ['A', 'B', 'D', 'C'][0:1]
+    all_orientations = ['P', 'L'][0:1]
+    all_context = ['all', 'close', 'near', 'none'][0:1]
 
     for direction in all_directions:
-        project_folder = os.path.join(r"C:\Users\Justin\Nextcloud\Projects\12_CISBAT23_trees\panelizer_models",
+        project_folder = os.path.join(r"/Users/jmccarty/Nextcloud/Projects/12_CISBAT23_trees/panelizer_models",
                                       direction)
         for cell_tech in all_cell_tech:
             for orientation in all_orientations:

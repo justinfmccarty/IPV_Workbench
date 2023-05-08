@@ -1024,8 +1024,8 @@ def solve_object_module_iv(panelizer_object, write_system=False, mp=False, displ
                     print(f"        Processing string {string} across the module list of length {len(modules)}")
 
                 module_start = time.time()
-                compile_mp.main_v2(panelizer_object, surface, string, tmy_location, dbt, psl, grid_pts, direct_ill,
-                                diffuse_ill)
+                # compile_mp.main_v3(panelizer_object, surface, string, tmy_location, dbt, psl, grid_pts, direct_ill, diffuse_ill)
+                compile_mp.main_v2(panelizer_object, surface, string, dbt, grid_pts, direct_ill, diffuse_ill)
                 module_end = time.time()
                 if display_print == True:
                     print(f"            Time elapsed for all modules: {round(module_end - module_start, 2)}s")
@@ -1153,6 +1153,32 @@ def compile_system_multi_core(module_dict_chunk, module_name_chunk, timeseries, 
 
     return module_results
 
+def compile_system_multi_core_v2(module_dict_chunk, module_name_chunk, timeseries, tmy_location, dbt, psl,
+                              pv_cells_xyz_arr_chunk, grid_pts, direct_ill_tup, diffuse_ill_tup, base_parameters,
+                              custom_module_data,
+                              default_submodule_map, default_diode_map, default_subcell_map, cell_type):
+    direct_ill = utils.unpack_shared_tuple(direct_ill_tup)
+    diffuse_ill = utils.unpack_shared_tuple(diffuse_ill_tup)
+
+    module_results = {}
+
+    for n, module_dict in enumerate(module_dict_chunk):
+        module_name = module_name_chunk[n]
+        pv_cells_xyz_arr = pv_cells_xyz_arr_chunk[n]
+        Imod, Vmod, Gmod, module_parameters = compile_system_single_core(module_dict, timeseries,
+                                                                         tmy_location, dbt, psl,
+                                                                         pv_cells_xyz_arr, grid_pts,
+                                                                         direct_ill, diffuse_ill,
+                                                                         base_parameters,
+                                                                         custom_module_data,
+                                                                         default_submodule_map,
+                                                                         default_diode_map,
+                                                                         default_subcell_map,
+                                                                         cell_type)
+
+        module_results.update({module_name: [Imod, Vmod, Gmod, module_parameters]})
+
+    return module_results
 
 def build_module_features(module_dict, timeseries, tmy_location, dbt, psl, pv_cells_xyz_arr, grid_pts, direct_ill,
                           diffuse_ill, base_parameters, custom_module_data, default_submodule_map, default_diode_map,
@@ -1166,7 +1192,11 @@ def build_module_features(module_dict, timeseries, tmy_location, dbt, psl, pv_ce
 
     # get direct and diffuse irradiance
     # pv_cells_xyz_arr = np.array(panelizer_object.get_cells_xyz(surface, string, module))
-    sensor_pts_xyz_arr = grid_pts[['X', 'Y', 'Z']].values
+
+    if type(grid_pts) == np.ndarray:
+        sensor_pts_xyz_arr = grid_pts[:,0:3]
+    else:
+        sensor_pts_xyz_arr = grid_pts[['X', 'Y', 'Z']].values
 
     # print(pv_cells_xyz_arr.shape,sensor_pts_xyz_arr.shape,direct_ill.T.shape)
     G_dir_ann = ipv_irrad.collect_raw_irradiance(pv_cells_xyz_arr,

@@ -10,11 +10,13 @@ from operator import itemgetter
 import os
 import pvlib
 
+
 def directory_creator(dir_path):
     if os.path.exists(dir_path):
         pass
     else:
         os.makedirs(dir_path)
+
 
 def ts_8760(year=2022):
     index = pd.date_range(start=f"01-01-{year} 00:00", end=f"12-31-{year} 23:00", freq="h")
@@ -173,7 +175,7 @@ def find_matching_key(all_keys, conditions, search_irrad, search_temp):
 
 def read_pickle(file_path, read_method='rb'):
     extension = file_path.split(".")[-1]
-    if extension=='xz':
+    if extension == 'xz':
         with lzma.open(file_path, read_method) as fp:
             cucumber = pickle.load(fp)
     else:
@@ -181,16 +183,15 @@ def read_pickle(file_path, read_method='rb'):
             cucumber = pickle.load(fp)
     return cucumber
 
-def write_pickle(cucumber, file_path, write_method="wb", compress=False):
 
-    if compress==False:
+def write_pickle(cucumber, file_path, write_method="wb", compress=False):
+    if compress == False:
         with open(file_path, write_method) as fp:
             pickle.dump(cucumber, fp, protocol=pickle.HIGHEST_PROTOCOL)
     else:
         with lzma.open(file_path, write_method) as fp:
             pickle.dump(cucumber, fp)
     return file_path
-
 
 
 def tmy_to_dataframe(path_data):
@@ -321,9 +322,9 @@ def create_voltage_range(sde_args, kwargs, curve_pts=1000):
 
 
 def read_map_excel(file_path):
-    submodule_map = pd.read_excel(file_path, header=None, sheet_name='submodule').to_numpy()#.tolist()
-    subdiode_map = pd.read_excel(file_path, header=None, sheet_name='subdiode').to_numpy()#.tolist()
-    subcell_map = pd.read_excel(file_path, header=None, sheet_name='subcell').to_numpy()#.tolist()
+    submodule_map = pd.read_excel(file_path, header=None, sheet_name='submodule').to_numpy()  # .tolist()
+    subdiode_map = pd.read_excel(file_path, header=None, sheet_name='subdiode').to_numpy()  # .tolist()
+    subcell_map = pd.read_excel(file_path, header=None, sheet_name='subcell').to_numpy()  # .tolist()
     return submodule_map, subdiode_map, subcell_map
 
 
@@ -332,6 +333,7 @@ def tmy_location(tmy_file):
         tmy_header = fp.readlines()
 
     tmy_first_line = tmy_header[0].split(",")
+    tmy_first_line = [l.strip('\n') for l in tmy_first_line]
     lat = round(float(tmy_first_line[6]), 3)
     lon = round(float(tmy_first_line[7]), 3)
     utc = int(float(tmy_first_line[8]))
@@ -360,6 +362,7 @@ def create_sun_mask(file_path_sun_up_hours):
     sun_up = pd.DataFrame(sun_up).reset_index().rename(columns={"index": "HOY", 0: "Sunny"})
     return sun_up, sun_hours
 
+
 def build_full_ill(file_path_sun_up_hours, ill_df):
     """
 
@@ -368,7 +371,7 @@ def build_full_ill(file_path_sun_up_hours, ill_df):
     :return:
     """
     if type(ill_df) is str:
-        ill_df = pd.read_csv(ill_df, delimiter=' ', header=None).iloc[:, 1:].T.reset_index(drop=True)
+        ill_df = pd.read_csv(ill_df, delimiter=' ', header=None, dtype='float32').iloc[:, 1:].T.reset_index(drop=True)
     sun_up, sun_hours = create_sun_mask(file_path_sun_up_hours)
     # sun_ill = pd.concat([sun_hours, ill_df], axis=1)
     # irrad_df = pd.merge(sun_up, sun_ill, how="left", on="HOY").fillna(0)
@@ -378,6 +381,7 @@ def build_full_ill(file_path_sun_up_hours, ill_df):
     del irrad_df['Sunny']
     del irrad_df['HOY']
     return irrad_df
+
 
 def get_cec_data(cec_key=None, file_path=None):
     if file_path is None:
@@ -390,11 +394,9 @@ def get_cec_data(cec_key=None, file_path=None):
         return mod_df[cec_key]
 
 
-
 def unpack_mp_results(mp_results, panelizer_object, surface, string, modules, timeseries):
-
     results_dict = {}
-    for r in mp_results: # size is based on n_cpu (just reorganizing from the pool)
+    for r in mp_results:  # size is based on n_cpu (just reorganizing from the pool)
         results_dict.update(r)
 
     for module in modules:
@@ -405,26 +407,38 @@ def unpack_mp_results(mp_results, panelizer_object, surface, string, modules, ti
         Vmod = module_results_dict[1]
         Gmod = module_results_dict[2]
 
-        module_dict.update({'PARAMETERS':module_results_dict[3]})
+        module_dict.update({'PARAMETERS': module_results_dict[3]})
         for hoy in timeseries:
-
             module_dict['CURVES']['Imod'].update({hoy: np.round(Imod[hoy], 5)})
             module_dict['CURVES']['Vmod'].update({hoy: np.round(Vmod[hoy], 5)})
             module_dict['YIELD']["initial_simulation"]['irrad'].update({hoy: np.round(Gmod[hoy], 1)})
 
 
 def clean_grasshopper_key(key):
-    return key.replace("{","").replace("}","").replace(";","_")
+    return key.replace("{", "").replace("}", "").replace(";", "_")
 
-def calc_self_sufficiency_consumption(demand,generation):
+
+def calc_self_sufficiency_consumption(demand, generation):
     net_demand = demand - generation
-    net_demand_clipped = np.where(net_demand<0,0,net_demand)
+    net_demand_clipped = np.where(net_demand < 0, 0, net_demand)
     pv_consumed = demand - net_demand_clipped
 
-    self_sufficiency = 100 * (pv_consumed / demand)
-    #preinit the array in case generation is zero (np.where does not work with division 0)
-    self_consumption = 100 * np.divide(pv_consumed,generation, out=np.zeros_like(pv_consumed), where=generation!=0)
+    self_sufficiency = np.where(demand == 0, 0, 100 * (pv_consumed / demand))
+
+    # preinit the array in case generation is zero (np.where does not work with division 0)
+    self_consumption = 100 * np.divide(pv_consumed, generation, out=np.zeros_like(pv_consumed), where=generation != 0)
     return self_sufficiency, self_consumption
+
+def calc_self_sufficiency_consumption_single_value(demand, generation):
+    net_demand = demand - generation
+    net_demand_clipped = np.where(net_demand < 0, 0, net_demand)
+    pv_consumed = demand - net_demand_clipped
+
+    self_sufficiency = np.sum(pv_consumed) / np.sum(demand) * 100
+    self_consumption = np.sum(pv_consumed) / np.sum(generation) * 100
+
+    return self_sufficiency, self_consumption
+
 
 def get_size(obj, seen=None):
     """Recursively finds size of objects"""
@@ -446,15 +460,15 @@ def get_size(obj, seen=None):
         size += sum([get_size(i, seen) for i in obj])
     return size
 
+
 def log_run(file_path, write_string):
-    #file_path = os.path.join(folder,"runtime.txt")
+    # file_path = os.path.join(folder,"runtime.txt")
     if os.path.exists(file_path):
         with open(file_path, "a") as fp:
             fp.write(write_string)
     else:
         with open(file_path, "w+") as fp:
             fp.write(write_string)
-
 
 
 def get_object_capacity(object_hourly_results):
@@ -476,3 +490,4 @@ def get_object_surface_area(object_hourly_results):
             area_cols.append(col)
 
     return object_hourly_results[area_cols].iloc[0].sum()
+

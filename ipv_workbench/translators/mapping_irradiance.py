@@ -32,7 +32,8 @@ def load_grid_file(bldg_radiance_dir, rad_surface_key, contextual_scenario):
         radiance_results_dir = os.path.join(radiance_results_scenarios_dir, contextual_scenario, "results")
 
     pts_path = glob.glob(os.path.join(radiance_results_dir, "annual_irradiance", "model", "grid", "*.pts"))[0]
-    return pd.read_csv(pts_path, delimiter=" ", header=None, names=["X", "Y", "Z", "X_v", "Y_v", "Z_v"])
+    return load_sensor_points(pts_path)
+    # return pd.read_csv(pts_path, delimiter=" ", header=None, names=["X", "Y", "Z", "X_v", "Y_v", "Z_v"])
 
 
 def collect_raw_irradiance(pv_cells_xyz_arr, sensor_pts_xyz_arr, sensor_pts_irradiance_arr):
@@ -52,12 +53,12 @@ def collect_raw_irradiance(pv_cells_xyz_arr, sensor_pts_xyz_arr, sensor_pts_irra
 
 
 def load_sensor_points(sensor_file):
-    return pd.read_csv(sensor_file, sep=' ', header=None, names=['x', 'y', 'z', 'xdir', 'ydir', 'zdir'])
+    return pd.read_csv(sensor_file, sep=' ', header=None, dtype='float64', names=["X", "Y", "Z", "X_v", "Y_v", "Z_v"])
 
 
 def load_irrad_data(irrad_complete_path, irrad_direct_path):
-    irrad_complete = pd.read_csv(irrad_complete_path, delimiter=' ', header=None).iloc[:, 1:].T.reset_index(drop=True)
-    irrad_dir_dir = pd.read_csv(irrad_direct_path, delimiter=' ', header=None).iloc[:, 1:].T.reset_index(drop=True)
+    irrad_complete = pd.read_csv(irrad_complete_path, delimiter=' ', header=None, dtype='float32',).iloc[:, 1:].T.reset_index(drop=True)
+    irrad_dir_dir = pd.read_csv(irrad_direct_path, delimiter=' ', header=None, dtype='float32',).iloc[:, 1:].T.reset_index(drop=True)
     return irrad_complete, irrad_dir_dir
 
 
