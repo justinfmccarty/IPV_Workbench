@@ -337,7 +337,7 @@ def tmy_location(tmy_file):
     lat = round(float(tmy_first_line[6]), 3)
     lon = round(float(tmy_first_line[7]), 3)
     utc = int(float(tmy_first_line[8]))
-    elevation = int(tmy_first_line[9][0:3])
+    elevation = int(float(tmy_first_line[9][0:3]))
     return {"lat": lat,
             "lon": lon,
             "utc": utc,
