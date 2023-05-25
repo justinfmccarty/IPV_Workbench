@@ -125,8 +125,14 @@ class PanelizedObject:
         self.LOADS_DIR = os.path.join(self.RESOURCES_DIR, "loads")
         utils.directory_creator(self.LOADS_DIR)
 
-        src_load_data = os.path.join(self.project_data, "annual_building_demand_time_period.csv")
-        shutil.copy2(src=src_load_data, dst=self.LOADS_DIR)
+        if self.project_data is None:
+            pass
+        else:
+            src_load_data = os.path.join(self.project_data, "annual_building_demand_time_period.csv")
+            if os.path.exists(os.path.join(self.LOADS_DIR,"annual_building_demand_time_period.csv")):
+                pass
+            else:
+                shutil.copy2(src=src_load_data, dst=self.LOADS_DIR)
 
     def find_sun_file(self):
         srf_dir = glob.glob(os.path.join(self.RADIANCE_DIR, "surface_*"))[0]

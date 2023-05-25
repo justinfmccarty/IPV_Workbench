@@ -1,6 +1,6 @@
 import lzma
 import sys
-
+import calendar
 import numpy as np
 import gzip
 import json
@@ -20,6 +20,9 @@ def directory_creator(dir_path):
 
 def ts_8760(year=2022):
     index = pd.date_range(start=f"01-01-{year} 00:00", end=f"12-31-{year} 23:00", freq="h")
+
+    if calendar.isleap(year):
+        index = index[~((index.month == 2) & (index.day == 29))]
     return index
 
 
@@ -194,7 +197,7 @@ def write_pickle(cucumber, file_path, write_method="wb", compress=False):
     return file_path
 
 
-def tmy_to_dataframe(path_data):
+def tmy_to_dataframe(path_data, create_timeseries=True):
     tmy_labels = [
         'year', 'month', 'day', 'hour', 'minute', 'datasource', 'drybulb_C',
         'dewpoint_C', 'relhum_percent', 'atmos_Pa', 'exthorrad_Whm2',
@@ -222,6 +225,12 @@ def tmy_to_dataframe(path_data):
         pass
         # print('TMY file hours maintained at 0-23hr')
     df['minute'] = 0
+
+    if create_timeseries==False:
+        pass
+    else:
+        df.set_index(ts_8760(df['year'].tolist()[0]),inplace=True)
+
     return df
 
 
