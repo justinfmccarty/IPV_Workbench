@@ -82,3 +82,42 @@ def get_timezone(latitude, longitude):
     """
 
     return TimezoneFinder().timezone_at(lat=latitude, lng=longitude)
+
+
+def filter_wea(wea_file, year, analysis_period):
+    """
+    Filters a .wea file using a datetime index based on the input hour range
+    :param wea_file: the .wea filepath
+    :param year: the year is needed for the datetime operation, but can be anything
+    :param analysis_period: a string of to hours of the year formatted with a dash separating them (0-8760)
+    :return: None
+    """
+
+    with open(wea_file, "r") as fp:
+        header = fp.readlines()[0:6]
+
+    # get wea data
+    df = pd.read_csv(wea_file, skiprows=6, header=None, sep=" ")
+    df.rename(columns={0: "month", 1: "day", 2: "hour"}, inplace=True)
+    df['year'] = year
+
+    # create datetime index
+    df.set_index(pd.to_datetime(df[["year", "month", "day", "hour"]]), inplace=True)
+
+    # filter df on datetime index
+    analysis_start = hoy_to_date(int(analysis_period.split("-")[0]), year=year)
+    analysis_end = hoy_to_date(int(analysis_period.split("-")[1]), year=year)
+    df = df.loc[analysis_start:analysis_end]
+
+    # cut to the body values and turn into a string
+    body = df[['month', 'day', 'hour', 3, 4]].reset_index(drop=True).astype(str).to_csv(path_or_buf=None, header=None,
+                                                                                        index=None, sep=" ")
+
+    # append body to the header string
+    header += body
+
+    # overwrite full wea with trimmed wea
+    with open(wea_file, "w") as fp:
+        fp.writelines(header)
+
+

@@ -9,6 +9,8 @@ import pandas as pd
 from operator import itemgetter
 import os
 import pvlib
+import shutil
+import subprocess
 
 
 def directory_creator(dir_path):
@@ -16,6 +18,13 @@ def directory_creator(dir_path):
         pass
     else:
         os.makedirs(dir_path)
+
+
+def copy_file(fsrc, fdst):
+    if not os.path.exists(fdst):
+        shutil.copyfile(fsrc, fdst)
+    else:
+        print(f"Destination file already exists, copy aborted./n{fdst}")
 
 
 def ts_8760(year=2022):
@@ -226,10 +235,10 @@ def tmy_to_dataframe(path_data, create_timeseries=True):
         # print('TMY file hours maintained at 0-23hr')
     df['minute'] = 0
 
-    if create_timeseries==False:
+    if create_timeseries == False:
         pass
     else:
-        df.set_index(ts_8760(df['year'].tolist()[0]),inplace=True)
+        df.set_index(ts_8760(df['year'].tolist()[0]), inplace=True)
 
     return df
 
@@ -371,6 +380,17 @@ def create_sun_mask(file_path_sun_up_hours):
     sun_up = pd.DataFrame(sun_up).reset_index().rename(columns={"index": "HOY", 0: "Sunny"})
     return sun_up, sun_hours
 
+def read_ill(filepath):
+    """
+
+    :param filepath: the ill filepath
+    :return: a pandas dataframe where each column is a snesor point and the rows coordinate to the timeseries analysed
+    """
+    # this works on honeybee files
+    # return pd.read_csv(filepath, delimiter=' ', header=None, dtype='float32').iloc[:, 1:].T.reset_index(drop=True)
+    df = pd.read_csv(filepath, header=None, skiprows=11, delimiter=' ', dtype='float')
+    df = df[range(1,len(df.columns))].round(2)
+    return df
 
 def build_full_ill(file_path_sun_up_hours, ill_df):
     """
@@ -380,7 +400,7 @@ def build_full_ill(file_path_sun_up_hours, ill_df):
     :return:
     """
     if type(ill_df) is str:
-        ill_df = pd.read_csv(ill_df, delimiter=' ', header=None, dtype='float32').iloc[:, 1:].T.reset_index(drop=True)
+        ill_df = read_ill(ill_df)
     sun_up, sun_hours = create_sun_mask(file_path_sun_up_hours)
     # sun_ill = pd.concat([sun_hours, ill_df], axis=1)
     # irrad_df = pd.merge(sun_up, sun_ill, how="left", on="HOY").fillna(0)
@@ -437,6 +457,7 @@ def calc_self_sufficiency_consumption(demand, generation):
     # preinit the array in case generation is zero (np.where does not work with division 0)
     self_consumption = 100 * np.divide(pv_consumed, generation, out=np.zeros_like(pv_consumed), where=generation != 0)
     return self_sufficiency, self_consumption
+
 
 def calc_self_sufficiency_consumption_single_value(demand, generation):
     net_demand = demand - generation
@@ -500,7 +521,25 @@ def get_object_surface_area(object_hourly_results):
 
     return object_hourly_results[area_cols].iloc[0].sum()
 
+
 def create_log_file(destination_path):
-    first_line = "scenario,device_name,module_orientation,module_cover,host,simulation_type,n_negatives,rad_par,runtime [sec]\n"
+    first_line = "scenario,device_name,module_orientation,module_cover,host,simulation_type,n_negatives,n_workers,n_points,rad_par,runtime [sec]\n"
     with open(destination_path, 'w') as fp:
         fp.writelines([first_line])
+
+
+
+def count_lines(text_file):
+    with open(text_file, "r") as fp:
+        line_count = len(fp.readlines())
+    return line_count
+
+
+def run_command(command):
+    """
+    :param command:
+    :return:
+    """
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    stdout, stderr = process.communicate()
+    return stdout, stderr, process.returncode

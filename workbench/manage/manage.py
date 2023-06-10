@@ -1,5 +1,7 @@
 import glob
 import os
+import subprocess
+
 import pandas as pd
 import pathlib
 import shutil
@@ -8,7 +10,7 @@ import configparser
 from workbench.utilities import utils, config_utils, time_utils
 
 
-def initiate_project(parent_directory, project_name, project_epw):
+def initiate_project(parent_directory, project_name, project_epw, device_name, module_orientation):
     """
 
     :param parent_directory: the directory within which to create a folder to hold the project inputs and outputs
@@ -23,7 +25,7 @@ def initiate_project(parent_directory, project_name, project_epw):
     if os.path.exists(new_config):
         pass
     else:
-        shutil.copyfile(default_config, new_config)
+        utils.copy_file(default_config, new_config)
 
     config_utils.edit_cfg_file(new_config, 'management', 'parent_dir', parent_directory)
     config_utils.edit_cfg_file(new_config, 'management', 'project_name', project_name)
@@ -38,6 +40,9 @@ def initiate_project(parent_directory, project_name, project_epw):
 
     timezone = time_utils.get_timezone(tmy_location['lat'], tmy_location['lon'])
     config_utils.edit_cfg_file(new_config, 'management', 'timezone', timezone)
+
+    config_utils.edit_cfg_file(new_config, 'analysis', 'device_name', device_name)
+    config_utils.edit_cfg_file(new_config, 'analysis', 'module_orientation', module_orientation)
 
     return new_config
 
@@ -90,7 +95,7 @@ class Project:
         self.SHARED_DIR = os.path.join(self.INPUTS_DIR, "shared")
         utils.directory_creator(self.SHARED_DIR)
         ### log file
-        self.LOG_FILE = os.path.join(self.SHARED_DIR, 'log_file.txt')
+        self.LOG_FILE = os.path.join(self.PROJECT_DIR, 'log_file.txt')
         if os.path.exists(self.LOG_FILE):
             pass
         else:
@@ -102,11 +107,11 @@ class Project:
         self.TMY_FILE = os.path.join(self.TMY_DIR, f"{self.management_scenario_name}.epw")
         if self.management_base_epw is None:
             default_epw_file = os.path.join(library_root, "template_files", "zurich_2001_2021.epw")
-            shutil.copyfile(default_epw_file, self.TMY_FILE)
+            utils.copy_file(default_epw_file, self.TMY_FILE)
             self.management_base_epw = default_epw_file
             self.edit_cfg_file('management', 'base_epw', self.management_base_epw)
         else:
-            shutil.copyfile(self.management_base_epw, self.TMY_FILE)
+            utils.copy_file(self.management_base_epw, self.TMY_FILE)
         self.SUN_UP_FILE = os.path.join(self.TMY_DIR, "sun-up-hours.txt")
 
         if os.path.exists(self.SUN_UP_FILE):
@@ -128,13 +133,13 @@ class Project:
             pass
         else:
             default_module_data = os.path.join(library_root, "devices", "default_devices", "cell_module_datasheets.csv")
-            shutil.copyfile(default_module_data, self.module_cell_data)
+            utils.copy_file(default_module_data, self.module_cell_data)
         self.cec_data = os.path.join(self.MODULE_CELL_DIR, "cec_database_local.csv")
         if os.path.exists(self.cec_data):
             pass
         else:
             default_module_data = os.path.join(library_root, "devices", "default_devices", "cec_database_local.csv")
-            shutil.copyfile(default_module_data, self.cec_data)
+            utils.copy_file(default_module_data, self.cec_data)
 
         self.MAPS_DIR = os.path.join(self.MODULE_CELL_DIR, "map_files")
         utils.directory_creator(self.MAPS_DIR)
@@ -148,7 +153,7 @@ class Project:
             if os.path.exists(dest_map):
                 pass
             else:
-                shutil.copyfile(map_file, dest_map)
+                utils.copy_file(map_file, dest_map)
 
         # outputs
         self.OUTPUTS_DIR = os.path.join(self.PROJECT_DIR, "outputs")
@@ -194,30 +199,69 @@ class Project:
         for file_ext in ["3dm", "gh"]:
             src = os.path.join(library_root, "template_files", f"0_workbench_geometry_template.{file_ext}")
             dst = os.path.join(self.GEOMETRY_DIR, f"0_workbench_geometry_template.{file_ext}")
-            shutil.copyfile(src, dst)
+            utils.copy_file(src, dst)
 
         # ## radiance writer
         # src = os.path.join(library_root, "template_files", f"0_workbench_radiance_writer_template.gh")
         # dst = os.path.join(self.GEOMETRY_DIR, f"0_workbench_radiance_writer_template.gh")
-        # shutil.copyfile(src, dst)
+        # utils.copy_file(src, dst)
 
         ## panelizer
         src = os.path.join(library_root, "template_files", f"1_workbench_panelizer_template.gh")
         dst = os.path.join(self.GEOMETRY_DIR, f"1_workbench_panelizer_template.gh")
-        shutil.copyfile(src, dst)
+        utils.copy_file(src, dst)
+
+        ## radiance files
+        self.skyglow_template = os.path.join(library_root, "template_files", "skyglow.rad")
 
         print("The project is initialized. We have created a base host object named 'B1000'.\n"
               "You will need to either move or create the geometry and panelizer files into the appropriate directories.\n"
               "The geometry files should follow the convention defined in the output of the template grasshopper and rhino files.\n"
               "The panelizer files are those that have been created using the grasshopper utility. The Panelizer is\n"
               "not ready for a pure python implementation as of yet.")
+    def get_irradiance_results(self):
+
+        active_surface = f"surface_{self.analysis_active_surface}"
+        utils.directory_creator(os.path.join(self.IRRADIANCE_RESULTS_DIR, active_surface))
+        self.DIRECT_IRRAD_FILE = os.path.join(self.IRRADIANCE_RESULTS_DIR, active_surface, "direct.feather")
+        self.DIFFUSE_IRRAD_FILE = os.path.join(self.IRRADIANCE_RESULTS_DIR, active_surface, "diffuse.feather")
+
+    def log(self, runtime, simulation_type, front_cover=None):
+        not_relevant = 'NA'
+        if front_cover is None:
+            front_cover = not_relevant
+        if simulation_type=='irradiance':
+            n_negatives = 0
+            rad_par = self.irradiance_radiance_param_rcontrib + " " + self.irradiance_radiance_param_rflux
+            n_workers = self.irradiance_n_workers
+            rad_surface_dir = os.path.join(self.RADIANCE_DIR, f"surface_{self.analysis_active_surface}")
+            grid_file = glob.glob(os.path.join(rad_surface_dir, "model", "grid", "*.pts"))[0]
+            n_points = int(grid_file.split("_")[-1].split("s")[0])
+        else:
+            n_negatives = not_relevant
+            rad_par = not_relevant
+            n_workers = self.analysis_n_workers
+            n_points = not_relevant
+        entry = f"{self.management_scenario_name},{self.analysis_device_name},{self.analysis_module_orientation}," \
+                f"{front_cover},{self.management_host_name}_{self.analysis_active_surface},{simulation_type}," \
+                f"{n_negatives},{n_workers},{n_points},{rad_par},{runtime}"
+        with open(self.LOG_FILE, "a") as fp:
+            fp.write(entry)
+
 
     def edit_cfg_file(self, section, key, new_value):
-        self.set(section, key, str(new_value))
+        self.config.set(section, key, str(new_value))
 
         # Writing our configuration file to 'example.ini'
         with open(self.config_file_path, 'w') as configfile:
-            self.write(configfile)
+            self.config.write(configfile)
+        self.config = configparser.ConfigParser()
+        self.config.read(self.config_file_path)
+        for section in self.config.sections():
+            for k in list(self.config[section].keys()):
+                value_in = self.config[section][k]
+                formatted_value = config_utils.format_config_item(section, k, value_in)
+                self.__setattr__(f"{section}_{k}", formatted_value)
 
     def create_sun_file(self):
         solpos = pvlib.solarposition.get_solarposition(

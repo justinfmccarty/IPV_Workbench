@@ -19,9 +19,16 @@ def format_config_item(section, key, value):
                                     'base_epw': 'path',
                                     'tmy_name': 'str',
                                     'timezone': 'str'},
+                     'analysis': {'device_name': 'str',
+                                  'module_orientation': 'str',
+                                  'analysis_period': 'str',
+                                  'active_surface': 'str',
+                                  'n_workers': 'int'},
                      'irradiance': {'grid_x_mm': 'float',
                                     'grid_y_mm': 'float',
-                                    'radiance_parameters': 'str'},
+                                    'radiance_param_rflux': 'str',
+                                    'radiance_param_rcontrib': 'str',
+                                    'n_workers': 'int'},
                      }
 
     if value == 'None':
