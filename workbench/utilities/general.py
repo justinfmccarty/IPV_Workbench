@@ -1,38 +1,37 @@
-import lzma
 import sys
-import calendar
 import numpy as np
-import gzip
-import json
-import pickle
 import pandas as pd
 from operator import itemgetter
 import os
 import pvlib
-import shutil
 import subprocess
+from scipy.spatial.distance import cdist
+from workbench.utilities import io
 
 
-def directory_creator(dir_path):
-    if os.path.exists(dir_path):
-        pass
+def collect_raw_irradiance(pv_cells_xyz_arr, sensor_pts_xyz_arr, sensor_pts_irradiance_arr, method="closest"):
+    # TODO add rectangular sampling based on cell dimensions
+    # print("PV Cells", pv_cells_xyz_arr.shape)
+    # print("Sensor XYZ", sensor_pts_xyz_arr.shape)
+    # print("Sensor irrad", sensor_pts_irradiance_arr.shape)
+    cdist_arr = cdist(pv_cells_xyz_arr, sensor_pts_xyz_arr)
+
+    if method == 'closest':
+        first = cdist_arr.argsort()[:, 0]
+        irrad_cell_mean = sensor_pts_irradiance_arr.T[first]
+    elif method == 'mean':
+        first = cdist_arr.argsort()[:, 0]
+        second = cdist_arr.argsort()[:, 1]
+        third = cdist_arr.argsort()[:, 2]
+        irrad_cell_mean = (sensor_pts_irradiance_arr.T[first] + sensor_pts_irradiance_arr.T[second] +
+                           sensor_pts_irradiance_arr.T[third]) / 3
     else:
-        os.makedirs(dir_path)
+        print("The arg 'method' must be specified as either 'closest' 'mean' (mean of nearest 3 points). "
+              "Defaulting to closest.")
+        first = cdist_arr.argsort()[:, 0]
+        irrad_cell_mean = sensor_pts_irradiance_arr.T[first]
 
-
-def copy_file(fsrc, fdst):
-    if not os.path.exists(fdst):
-        shutil.copyfile(fsrc, fdst)
-    else:
-        print(f"Destination file already exists, copy aborted./n{fdst}")
-
-
-def ts_8760(year=2022):
-    index = pd.date_range(start=f"01-01-{year} 00:00", end=f"12-31-{year} 23:00", freq="h")
-
-    if calendar.isleap(year):
-        index = index[~((index.month == 2) & (index.day == 29))]
-    return index
+    return irrad_cell_mean.T
 
 
 def flatten_list(lst):
@@ -53,31 +52,6 @@ def flip_maps(arr):
         return np.fliplr(np.array(arr).T)
     else:
         return arr
-
-
-def read_parameter_file(parameter_file):
-    """
-    :param parameter_file: a file path for the specific text file used for parameters
-    :return: cell_parameters: a dict containing the cell parameters in the file
-    """
-    with open(parameter_file, "r") as fp:
-        data = fp.readlines()
-        keys = []
-        items = []
-        for text_line in data:
-            if text_line[0] == r"#":
-                pass
-            else:
-
-                key = str(text_line).split(":")[0]
-                keys.append(key)
-                item = str(text_line).split(":")[1]
-                try:
-                    items.append(float(item.strip().strip(" ").strip("'")))
-                except ValueError:
-                    items.append(str(item.strip().strip("'")))
-    cell_parameters = dict(zip(keys, items))
-    return cell_parameters
 
 
 # TODO build param file generator
@@ -116,31 +90,6 @@ def chunk_list(lst, n):
     for i in range(0, len(lst), n):
         new_list.append(lst[i:i + n])
     return new_list
-
-
-def read_json(file_path):
-    if ".gz" in file_path:
-        with gzip.open(file_path, 'r') as fp:
-            json_bytes = fp.read()
-
-        json_str = json_bytes.decode('utf-8')
-        data = json.loads(json_str)
-    else:
-        with open(file_path, 'r') as fp:
-            data = json.load(fp)
-    return data
-
-
-def write_json(input_dict, out_path):
-    if ".gz" in out_path:
-        json_str = json.dumps(input_dict)
-        json_bytes = json_str.encode('utf-8')
-
-        with gzip.open(out_path, 'w') as fp:
-            fp.write(json_bytes)
-    else:
-        with open(out_path, 'w') as fp:
-            json.dump(input_dict, fp)
 
 
 def find_unique_condition(conditions_list):
@@ -183,64 +132,6 @@ def find_matching_key(all_keys, conditions, search_irrad, search_temp):
                           "Try to modify the search so irrad is 0 to 1000 and temp -45 to 45")
     else:
         return matching_temp[0]
-
-
-def read_pickle(file_path, read_method='rb'):
-    extension = file_path.split(".")[-1]
-    if extension == 'xz':
-        with lzma.open(file_path, read_method) as fp:
-            cucumber = pickle.load(fp)
-    else:
-        with open(file_path, read_method) as fp:
-            cucumber = pickle.load(fp)
-    return cucumber
-
-
-def write_pickle(cucumber, file_path, write_method="wb", compress=False):
-    if compress == False:
-        with open(file_path, write_method) as fp:
-            pickle.dump(cucumber, fp, protocol=pickle.HIGHEST_PROTOCOL)
-    else:
-        with lzma.open(file_path, write_method) as fp:
-            pickle.dump(cucumber, fp)
-    return file_path
-
-
-def tmy_to_dataframe(path_data, create_timeseries=True):
-    tmy_labels = [
-        'year', 'month', 'day', 'hour', 'minute', 'datasource', 'drybulb_C',
-        'dewpoint_C', 'relhum_percent', 'atmos_Pa', 'exthorrad_Whm2',
-        'extdirrad_Whm2', 'horirsky_Whm2', 'glohorrad_Whm2', 'dirnorrad_Whm2',
-        'difhorrad_Whm2', 'glohorillum_lux', 'dirnorillum_lux',
-        'difhorillum_lux', 'zenlum_lux', 'winddir_deg', 'windspd_ms',
-        'totskycvr_tenths', 'opaqskycvr_tenths', 'visibility_km',
-        'ceiling_hgt_m', 'presweathobs', 'presweathcodes', 'precip_wtr_mm',
-        'aerosol_opt_thousandths', 'snowdepth_cm', 'days_last_snow', 'Albedo',
-        'liq_precip_depth_mm', 'liq_precip_rate_Hour'
-    ]
-
-    df = pd.read_csv(path_data,
-                     skiprows=8,
-                     header=None,
-                     index_col=False,
-                     usecols=list(range(0, 35)),
-                     names=tmy_labels)  # .drop('datasource', axis=1)
-
-    df['hour'] = df['hour'].astype(int)
-    if df['hour'][0] == 1:
-        # print('TMY file hours reduced from 1-24h to 0-23h')
-        df['hour'] = df['hour'] - 1
-    else:
-        pass
-        # print('TMY file hours maintained at 0-23hr')
-    df['minute'] = 0
-
-    if create_timeseries == False:
-        pass
-    else:
-        df.set_index(ts_8760(df['year'].tolist()[0]), inplace=True)
-
-    return df
 
 
 def archive_expand_ndarray_2d_3d_slow(ndarray_input):
@@ -339,13 +230,6 @@ def create_voltage_range(sde_args, kwargs, curve_pts=1000):
     return evaluated_voltages
 
 
-def read_map_excel(file_path):
-    submodule_map = pd.read_excel(file_path, header=None, sheet_name='submodule').to_numpy()  # .tolist()
-    subdiode_map = pd.read_excel(file_path, header=None, sheet_name='subdiode').to_numpy()  # .tolist()
-    subcell_map = pd.read_excel(file_path, header=None, sheet_name='subcell').to_numpy()  # .tolist()
-    return submodule_map, subdiode_map, subcell_map
-
-
 def tmy_location(tmy_file):
     with open(tmy_file, "r") as fp:
         tmy_header = fp.readlines()
@@ -380,47 +264,23 @@ def create_sun_mask(file_path_sun_up_hours):
     sun_up = pd.DataFrame(sun_up).reset_index().rename(columns={"index": "HOY", 0: "Sunny"})
     return sun_up, sun_hours
 
-def read_ill(filepath):
+
+def build_full_ill(ill_df, wea_file=None):
     """
 
-    :param filepath: the ill filepath
-    :return: a pandas dataframe where each column is a snesor point and the rows coordinate to the timeseries analysed
-    """
-    # this works on honeybee files
-    # return pd.read_csv(filepath, delimiter=' ', header=None, dtype='float32').iloc[:, 1:].T.reset_index(drop=True)
-    df = pd.read_csv(filepath, header=None, skiprows=11, delimiter=' ', dtype='float')
-    df = df[range(1,len(df.columns))].round(2)
-    return df
-
-def build_full_ill(file_path_sun_up_hours, ill_df):
-    """
-
-    :param file_path_sun_up_hours: the path to the accompanying sun_up_hours.txt file
     :param ill_df: either the .ill file read as a dataframe or the path to it
     :return:
     """
     if type(ill_df) is str:
-        ill_df = read_ill(ill_df)
-    sun_up, sun_hours = create_sun_mask(file_path_sun_up_hours)
-    # sun_ill = pd.concat([sun_hours, ill_df], axis=1)
-    # irrad_df = pd.merge(sun_up, sun_ill, how="left", on="HOY").fillna(0)
+        ill_df = io.read_ill(ill_df)
 
-    ill_df.set_index(pd.Series(sun_hours['HOY'].tolist()), inplace=True)
-    irrad_df = sun_up.join(ill_df)
-    del irrad_df['Sunny']
-    del irrad_df['HOY']
-    return irrad_df
-
-
-def get_cec_data(cec_key=None, file_path=None):
-    if file_path is None:
-        mod_df = pvlib.pvsystem.retrieve_sam("CECMod")
+    if wea_file is None:
+        pass
     else:
-        mod_df = pd.read_csv(file_path, index_col='Unnamed: 0')
-    if cec_key is None:
-        return mod_df
-    else:
-        return mod_df[cec_key]
+        wea, header = io.read_wea(wea_file)
+        ill_df.set_index(wea.index, inplace=True, drop=True)
+
+    return ill_df
 
 
 def unpack_mp_results(mp_results, panelizer_object, surface, string, modules, timeseries):
@@ -447,27 +307,6 @@ def clean_grasshopper_key(key):
     return key.replace("{", "").replace("}", "").replace(";", "_")
 
 
-def calc_self_sufficiency_consumption(demand, generation):
-    net_demand = demand - generation
-    net_demand_clipped = np.where(net_demand < 0, 0, net_demand)
-    pv_consumed = demand - net_demand_clipped
-
-    self_sufficiency = np.where(demand == 0, 0, 100 * (pv_consumed / demand))
-
-    # preinit the array in case generation is zero (np.where does not work with division 0)
-    self_consumption = 100 * np.divide(pv_consumed, generation, out=np.zeros_like(pv_consumed), where=generation != 0)
-    return self_sufficiency, self_consumption
-
-
-def calc_self_sufficiency_consumption_single_value(demand, generation):
-    net_demand = demand - generation
-    net_demand_clipped = np.where(net_demand < 0, 0, net_demand)
-    pv_consumed = demand - net_demand_clipped
-
-    self_sufficiency = np.sum(pv_consumed) / np.sum(demand) * 100
-    self_consumption = np.sum(pv_consumed) / np.sum(generation) * 100
-
-    return self_sufficiency, self_consumption
 
 
 def get_size(obj, seen=None):
@@ -520,13 +359,6 @@ def get_object_surface_area(object_hourly_results):
             area_cols.append(col)
 
     return object_hourly_results[area_cols].iloc[0].sum()
-
-
-def create_log_file(destination_path):
-    first_line = "scenario,device_name,module_orientation,module_cover,host,simulation_type,n_negatives,n_workers,n_points,rad_par,runtime [sec]\n"
-    with open(destination_path, 'w') as fp:
-        fp.writelines([first_line])
-
 
 
 def count_lines(text_file):

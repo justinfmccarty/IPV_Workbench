@@ -2,10 +2,10 @@ import time
 import os
 import numpy as np
 import pandas as pd
-from workbench.utilities import utils
+from workbench.utilities import general
 from workbench.host import host
 from workbench.host import results_writers as ipv_results
-from workbench.devices import devices
+from workbench.device import cell_devices
 
 
 def format_raw_filename(cell_technology, orientation, front_cover, object_name):
@@ -50,10 +50,10 @@ def run_configuration(project_folder, surface, building, direction, cell_technol
         return None
 
     # run the major simulation
-    print("     Starting module solver...")
+    print("     Starting module old_solver...")
     solver_start = time.time()
     host.solve_object_module_iv(panelizer_object, display_print=True, mp=True)
-    print(f"     Module IV solver finished in {round(time.time() - solver_start, 1)} seconds")
+    print(f"     Module IV old_solver finished in {round(time.time() - solver_start, 1)} seconds")
 
     # save the data
     # transfer necessary data between levels

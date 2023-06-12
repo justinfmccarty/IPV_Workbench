@@ -1,66 +1,19 @@
-# coding=utf-8
 import os
-from workbench.utilities import utils
-from workbench.utilities import time_utils
 import numpy as np
 import pandas as pd
 import pvlib
-from scipy.spatial.distance import cdist
 import glob
+from workbench.utilities import io, general, temporal
 
 
-def load_irradiance_file(bldg_radiance_dir, rad_surface_key, component, contextual_scenario=None):
-    radiance_results_dir = os.path.join(bldg_radiance_dir, f"surface_{rad_surface_key}", "results")
-    radiance_results_scenarios_dir = os.path.join(bldg_radiance_dir, f"surface_{rad_surface_key}", "scenario_results")
-
-    if os.path.exists(radiance_results_scenarios_dir):
-        radiance_results_dir = os.path.join(radiance_results_scenarios_dir, contextual_scenario, "results")
-
-    sun_up_path = os.path.join(radiance_results_dir, "annual_irradiance", "results", f"{component}", "sun-up-hours.txt")
-    # print(os.path.join(radiance_results_dir, component_results_dir))
-    ill_path = glob.glob(os.path.join(radiance_results_dir, "annual_irradiance", "results", f"{component}", "*.ill"))[0]
-    ill_df = utils.build_full_ill(sun_up_path, ill_path)
-    ill_df.sort_index(inplace=True)
-    return ill_df
 
 
-def load_grid_file(bldg_radiance_dir, rad_surface_key, contextual_scenario):
-    radiance_results_dir = os.path.join(bldg_radiance_dir, f"surface_{rad_surface_key}", "results")
-    radiance_results_scenarios_dir = os.path.join(bldg_radiance_dir, f"surface_{rad_surface_key}", "scenario_results")
-
-    if os.path.exists(radiance_results_scenarios_dir):
-        radiance_results_dir = os.path.join(radiance_results_scenarios_dir, contextual_scenario, "results")
-
-    pts_path = glob.glob(os.path.join(radiance_results_dir, "annual_irradiance", "model", "grid", "*.pts"))[0]
-    return load_sensor_points(pts_path)
-    # return pd.read_csv(pts_path, delimiter=" ", header=None, names=["X", "Y", "Z", "X_v", "Y_v", "Z_v"])
 
 
-def collect_raw_irradiance(pv_cells_xyz_arr, sensor_pts_xyz_arr, sensor_pts_irradiance_arr):
-    # TODO change this to use rectangular sampling based on cell dimensions
-    # print("PV Cells", pv_cells_xyz_arr.shape)
-    # print("Sensor XYZ", sensor_pts_xyz_arr.shape)
-    # print("Sensor irrad", sensor_pts_irradiance_arr.shape)
-    cdist_arr = cdist(pv_cells_xyz_arr, sensor_pts_xyz_arr)
-    first = cdist_arr.argsort()[:, 0]
-    second = cdist_arr.argsort()[:, 1]
-    third = cdist_arr.argsort()[:, 2]
-    # print(cdist_arr[:, 0].shape)
-
-    irrad_cell_mean = (sensor_pts_irradiance_arr.T[first] + sensor_pts_irradiance_arr.T[second] +
-                       sensor_pts_irradiance_arr.T[third]) / 3
-    return irrad_cell_mean.T
-
-
-def load_sensor_points(sensor_file):
-    return pd.read_csv(sensor_file, sep=' ', header=None, dtype='float64', names=["X", "Y", "Z", "X_v", "Y_v", "Z_v"])
-
-
-def load_irrad_data(irrad_complete_path, irrad_direct_path):
-    irrad_complete = pd.read_csv(irrad_complete_path, delimiter=' ', header=None, dtype='float32',).iloc[:, 1:].T.reset_index(drop=True)
-    irrad_dir_dir = pd.read_csv(irrad_direct_path, delimiter=' ', header=None, dtype='float32',).iloc[:, 1:].T.reset_index(drop=True)
-    return irrad_complete, irrad_dir_dir
-
+# def load_irrad_data(irrad_complete_path, irrad_direct_path):
+#     irrad_complete = pd.read_csv(irrad_complete_path, delimiter=' ', header=None, dtype='float32',).iloc[:, 1:].T.reset_index(drop=True)
+#     irrad_dir_dir = pd.read_csv(irrad_direct_path, delimiter=' ', header=None, dtype='float32',).iloc[:, 1:].T.reset_index(drop=True)
+#     return irrad_complete, irrad_dir_dir
 
 def angle_between_vectors(vector1, vector2):
     """
@@ -174,7 +127,7 @@ def front_cover_loss(irradiance, color):
         light_grey    0.118
     :return: irradiance multiplied by the loss factor
     """
-    table_filepath = os.path.join(os.path.dirname(__file__), "../solver/front_cover_loss_table.csv")
+    table_filepath = os.path.join(os.path.dirname(__file__), "../old_solver/front_cover_loss_table.csv")
     if os.path.exists(table_filepath):
         loss_table = pd.read_csv(table_filepath, index_col='Unnamed: 0')
     else:
@@ -213,7 +166,7 @@ def calculate_effective_irradiance_single_step(G_dir, G_diff, evaluated_normal_v
     # part 2: angle of incidence mod
     # TODO modifiy vector calcs to take an array and return an array in case of non-planar module
     surface_azimuth, surface_tilt = vector_to_tilt_and_azimuth(evaluated_normal_vector)
-    solar_position_hoy = pvlib.solarposition.get_solarposition(time_utils.hoy_to_date(hoy),
+    solar_position_hoy = pvlib.solarposition.get_solarposition(temporal.hoy_to_date(hoy),
                                                                tmy_location['lat'],
                                                                tmy_location['lon'],
                                                                altitude=tmy_location['elevation'],
@@ -259,7 +212,7 @@ def calculate_effective_irradiance_timeseries(G_dir, G_diff, evaluated_normal_ve
     surface_azimuth, surface_tilt = vector_to_tilt_and_azimuth(evaluated_normal_vector)
     # print(pressure.shape, time_utils.hoy_to_date(hoy).shape)
 
-    solar_position_hoy = pvlib.solarposition.get_solarposition(time_utils.hoy_to_date(hoy),
+    solar_position_hoy = pvlib.solarposition.get_solarposition(temporal.hoy_to_date(hoy),
                                                                tmy_location['lat'],
                                                                tmy_location['lon'],
                                                                altitude=tmy_location['elevation'],
@@ -285,7 +238,7 @@ def get_effective_module_irradiance(panelizer_object, surface, string, module_na
     module_dict = panelizer_object.get_dict_instance([surface, string, module_name])
     module_normal = tuple(module_dict['CELLSNORMALS'][0])
     front_cover = module_dict['LAYERS']['front_film']
-    tmy_location = utils.tmy_location(panelizer_object.tmy_file)
+    tmy_location = general.tmy_location(panelizer_object.tmy_file)
     timeseries = panelizer_object.all_hoy
     dbt = panelizer_object.tmy_dataframe['drybulb_C'].values[timeseries]
     psl = panelizer_object.tmy_dataframe['atmos_Pa'].values[timeseries]

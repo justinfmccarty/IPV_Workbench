@@ -1,11 +1,11 @@
 import numpy as np
 import multiprocessing as mp
-from multiprocessing.shared_memory import SharedMemory
 from multiprocessing.managers import SharedMemoryManager
+
+import workbench.utilities.io
 from workbench.host import module_mapping as ipv_mm
-from workbench.host import host
-from workbench.utilities import utils
-from workbench.host import mapping_irradiance as ipv_irrad
+from workbench.utilities import general
+from workbench.irradiance import method_effective_irradiance as ipv_irrad
 import pandas as pd
 
 
@@ -37,7 +37,7 @@ def main(panelizer_object, surface, string, tmy_location, dbt, psl, grid_pts, di
     cell_type = ipv_mm.get_cell_type(module_template[0])
     orientation = ipv_mm.get_orientation(module_template[1])
     map_file = [fp for fp in panelizer_object.map_files if f"{cell_type}_{orientation}" in fp][0]
-    default_submodule_map, default_diode_map, default_subcell_map = utils.read_map_excel(map_file)
+    default_submodule_map, default_diode_map, default_subcell_map = workbench.utilities.io.read_map_excel(map_file)
 
     with mp.Pool(processes=ncpu) as pool:
         # print("    Pool Opened")
@@ -108,7 +108,7 @@ def main_v2(panelizer_object, surface, string, dbt, grid_pts, direct_ill, diffus
     cell_type = ipv_mm.get_cell_type(module_template[0])
     orientation = ipv_mm.get_orientation(module_template[1])
     map_file = [fp for fp in panelizer_object.map_files if f"{cell_type}_{orientation}" in fp][0]
-    default_submodule_map, default_diode_map, default_subcell_map = utils.read_map_excel(map_file)
+    default_submodule_map, default_diode_map, default_subcell_map = workbench.utilities.io.read_map_excel(map_file)
 
     print("    Opening pools")
     with mp.Pool(processes=ncpu) as pool:
@@ -166,7 +166,7 @@ def main_v3(panelizer_object, surface, string, tmy_location, dbt, psl, grid_pts,
     cell_type = ipv_mm.get_cell_type(module_template[0])
     orientation = ipv_mm.get_orientation(module_template[1])
     map_file = [fp for fp in panelizer_object.map_files if f"{cell_type}_{orientation}" in fp][0]
-    default_submodule_map, default_diode_map, default_subcell_map = utils.read_map_excel(map_file)
+    default_submodule_map, default_diode_map, default_subcell_map = workbench.utilities.io.read_map_excel(map_file)
 
     # name the memory
     shared_names = [f"{string}_shm_direct", f"{string}_shm_diffuse"] #f"{string}_shm_grid",

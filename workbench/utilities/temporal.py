@@ -1,6 +1,22 @@
-import pandas as pd
+import calendar
+import time
+
 import numpy as np
+import pandas as pd
 from timezonefinder import TimezoneFinder
+
+from workbench.utilities import io
+
+
+
+def ts_8760(year=2022, tz=None):
+    if tz is None:
+        index = pd.date_range(start=f"01-01-{year} 00:00", end=f"12-31-{year} 23:00", freq="h")
+    else:
+        index = pd.date_range(start=f"01-01-2022 00:30", end=f"12-31-2022 23:30", freq="h", tz=tz)
+    if calendar.isleap(year):
+        index = index[~((index.month == 2) & (index.day == 29))]
+    return index
 
 
 def create_datetime(start="01-01-2023-00:00", end="12-31-2023-23:00", freq='H', override_leap=False):
@@ -34,13 +50,22 @@ def hoy_to_date(hoy, year=2023):
     return pd.Timestamp(f'{year}-01-01') + pd.to_timedelta(hoy, unit='H')
 
 
+def datetime_index_to_hoy_array(datetime_idx):
+    hoy_list = []
+    for timestamp in datetime_idx:
+        hoy_list.append(get_hoy(timestamp))
+    return np.array(hoy_list)
+
 def get_hoy(timestamp):
     """
     :param timestamp: a string input should be in the form 'YYYY-MM-DD-HH:MM'
     :return: int hour difference
     """
 
-    year = timestamp.split("-")[0]
+    if type(timestamp) is str:
+        year = timestamp.split("-")[0]
+    else:
+        year = timestamp.year
     delta = np.datetime64(timestamp) - np.datetime64(f"{year}-01-01")
     return delta.astype('timedelta64[h]').astype(np.int32)
 
@@ -73,6 +98,7 @@ def build_analysis_period(sunup_array,hourly_resolution):
 
     return analysis_timeseries
 
+
 def get_timezone(latitude, longitude):
     """
 
@@ -92,17 +118,7 @@ def filter_wea(wea_file, year, analysis_period):
     :param analysis_period: a string of to hours of the year formatted with a dash separating them (0-8760)
     :return: None
     """
-
-    with open(wea_file, "r") as fp:
-        header = fp.readlines()[0:6]
-
-    # get wea data
-    df = pd.read_csv(wea_file, skiprows=6, header=None, sep=" ")
-    df.rename(columns={0: "month", 1: "day", 2: "hour"}, inplace=True)
-    df['year'] = year
-
-    # create datetime index
-    df.set_index(pd.to_datetime(df[["year", "month", "day", "hour"]]), inplace=True)
+    df, header = io.read_wea(wea_file, year=year)
 
     # filter df on datetime index
     analysis_start = hoy_to_date(int(analysis_period.split("-")[0]), year=year)
@@ -121,3 +137,5 @@ def filter_wea(wea_file, year, analysis_period):
         fp.writelines(header)
 
 
+def current_time():
+    return time.strftime('%Y-%m-%dT%H:%M:%S', time.localtime())

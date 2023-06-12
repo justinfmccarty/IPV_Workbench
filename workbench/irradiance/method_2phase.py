@@ -8,7 +8,8 @@ import time
 import numpy as np
 import pandas as pd
 import pyarrow.feather as feather
-from workbench.utilities import utils, time_utils
+
+from workbench.utilities import general, temporal, io, constants
 
 
 def change_plastic_material(filepath, line_idx, item_idx, new_name):
@@ -36,32 +37,32 @@ def create_black_objects(input_f, output_f):
 def build_cmd_oconv(radiance_project_dir, radiance_surface_key, step):
     cmd = ['oconv']
 
-    rad_surface_dir = os.path.join(radiance_project_dir, f"surface_{radiance_surface_key}")
-    oct_dir = os.path.join(rad_surface_dir, "outputs", "octree")
-    utils.directory_creator(oct_dir)
+    radiance_surface_dir = os.path.join(radiance_project_dir, f"surface_{radiance_surface_key}")
+    oct_dir = os.path.join(radiance_surface_dir, "outputs", "octree")
+    io.directory_creator(oct_dir)
 
-    object_material_file = os.path.join(rad_surface_dir, "model", "scene", "envelope.mat")
-    object_file = os.path.join(rad_surface_dir, "model", "scene", "envelope.rad")
-    black_object_material_file = os.path.join(rad_surface_dir, "model", "scene", "envelope.blk")
+    object_material_file = os.path.join(radiance_surface_dir, "model", "scene", "envelope.mat")
+    object_file = os.path.join(radiance_surface_dir, "model", "scene", "envelope.rad")
+    black_object_material_file = os.path.join(radiance_surface_dir, "model", "scene", "envelope.blk")
     change_plastic_material(black_object_material_file, 0 , 2, "black")
-    black_object_file = os.path.join(rad_surface_dir, "model", "scene", "envelope_black.rad")
+    black_object_file = os.path.join(radiance_surface_dir, "model", "scene", "envelope_black.rad")
     if os.path.exists(black_object_file):
         pass
     else:
         create_black_objects(object_file, black_object_file)
 
-    glazing_material_file = os.path.join(rad_surface_dir, "model", "aperture", "aperture.mat")
-    glazing_file = os.path.join(rad_surface_dir, "model", "aperture", "aperture.rad")
-    black_glazing_material_file = os.path.join(rad_surface_dir, "model", "aperture", "aperture.blk")
+    glazing_material_file = os.path.join(radiance_surface_dir, "model", "aperture", "aperture.mat")
+    glazing_file = os.path.join(radiance_surface_dir, "model", "aperture", "aperture.rad")
+    black_glazing_material_file = os.path.join(radiance_surface_dir, "model", "aperture", "aperture.blk")
     change_plastic_material(black_glazing_material_file, 0, 2, "black")
-    black_glazing_file = os.path.join(rad_surface_dir, "model", "aperture", "aperture_black.rad")
+    black_glazing_file = os.path.join(radiance_surface_dir, "model", "aperture", "aperture_black.rad")
 
     if os.path.exists(black_glazing_file):
         pass
     else:
         create_black_objects(glazing_file, black_glazing_file)
 
-    sun_file = os.path.join(rad_surface_dir, "model", "scene", "suns.rad")
+    sun_file = os.path.join(radiance_surface_dir, "model", "scene", "suns.rad")
 
     if step == "total":
         oct_name = "total.oct"
@@ -118,11 +119,11 @@ def create_skyglow(skyglow_file, resolution, dst):
 def build_cmd_rfluxmtx(radiance_project_dir, radiance_surface_key, skyglow_template, step,
                        n_workers=None, rad_params=None):
     cmd = ["rfluxmtx", "-I+"]
-    rad_surface_dir = os.path.join(radiance_project_dir, f"surface_{radiance_surface_key}")
-    output_dir = os.path.join(rad_surface_dir, "outputs", "matrices")
-    utils.directory_creator(output_dir)
+    radiance_surface_dir = os.path.join(radiance_project_dir, f"surface_{radiance_surface_key}")
+    output_dir = os.path.join(radiance_surface_dir, "outputs", "matrices")
+    io.directory_creator(output_dir)
 
-    skyglow_file = os.path.join(rad_surface_dir, "model", "scene", "skyglow.rad")
+    skyglow_file = os.path.join(radiance_surface_dir, "model", "scene", "skyglow.rad")
     if os.path.exists(skyglow_file):
         pass
     else:
@@ -130,7 +131,7 @@ def build_cmd_rfluxmtx(radiance_project_dir, radiance_surface_key, skyglow_templ
         sky_resolution = 1
         create_skyglow(skyglow_template, str(sky_resolution), skyglow_file)
 
-    oct_dir = os.path.join(rad_surface_dir, "outputs", "octree")
+    oct_dir = os.path.join(radiance_surface_dir, "outputs", "octree")
     if step == 'total':
         octree_file = os.path.join(oct_dir, "total.oct")
         output_file = os.path.join(output_dir, 'total_illum.mtx')
@@ -141,7 +142,7 @@ def build_cmd_rfluxmtx(radiance_project_dir, radiance_surface_key, skyglow_templ
         print("Arg 'step' must be specified as 'total' or 'direct'")
         return TypeError
 
-    grid_file = glob.glob(os.path.join(rad_surface_dir, "model", "grid", "*.pts"))[0]
+    grid_file = glob.glob(os.path.join(radiance_surface_dir, "model", "grid", "*.pts"))[0]
     line_count = int(grid_file.split("_")[-1].split("s")[0])
     # lines in grid file
     # line_count = utils.count_lines(grid_file)
@@ -168,10 +169,10 @@ def build_cmd_rfluxmtx(radiance_project_dir, radiance_surface_key, skyglow_templ
 
 def build_cmd_epw2wea(radiance_project_dir, radiance_surface_key, input_epw):
     input_epw = pathlib.Path(input_epw)
-    rad_surface_dir = os.path.join(radiance_project_dir, f"surface_{radiance_surface_key}")
+    radiance_surface_dir = os.path.join(radiance_project_dir, f"surface_{radiance_surface_key}")
     wea_name = input_epw.name.replace(".epw", ".wea")
 
-    output_wea = os.path.join(rad_surface_dir, 'model', wea_name)
+    output_wea = os.path.join(radiance_surface_dir, 'model', wea_name)
 
     cmd = ['epw2wea']
 
@@ -195,8 +196,8 @@ def build_cmd_gendaymtx(radiance_project_dir, radiance_surface_key, wea_file, st
     """
     cmd = ['gendaymtx']
 
-    rad_surface_dir = os.path.join(radiance_project_dir, f"surface_{radiance_surface_key}")
-    output_dir = os.path.join(rad_surface_dir, "outputs", "matrices")
+    radiance_surface_dir = os.path.join(radiance_project_dir, f"surface_{radiance_surface_key}")
+    output_dir = os.path.join(radiance_surface_dir, "outputs", "matrices")
 
     if step == 'total':
         output_file = os.path.join(output_dir, 'sky_total.smx')
@@ -225,8 +226,8 @@ def build_cmd_dctimestep(radiance_project_dir, radiance_surface_key, step):
     """
 
     cmd = ['dctimestep']
-    rad_surface_dir = os.path.join(radiance_project_dir, f"surface_{radiance_surface_key}")
-    matrices_dir = os.path.join(rad_surface_dir, "outputs", "matrices")
+    radiance_surface_dir = os.path.join(radiance_project_dir, f"surface_{radiance_surface_key}")
+    matrices_dir = os.path.join(radiance_surface_dir, "outputs", "matrices")
 
     if step == 'total':
         input_matrix = os.path.join(matrices_dir, 'total_illum.mtx')
@@ -260,9 +261,9 @@ def build_cmd_rmtxop(radiance_project_dir, radiance_surface_key, step):
 
     cmd = ['rmtxop']
     cmd += ["-fa", "-t", "-c", "47.4", "119.9", "11.6", "-"]
-    rad_surface_dir = os.path.join(radiance_project_dir, f"surface_{radiance_surface_key}")
-    output_dir = os.path.join(rad_surface_dir, "outputs", "results")
-    utils.directory_creator(output_dir)
+    radiance_surface_dir = os.path.join(radiance_project_dir, f"surface_{radiance_surface_key}")
+    output_dir = os.path.join(radiance_surface_dir, "outputs", "results")
+    io.directory_creator(output_dir)
 
     if step == 'total':
         output_file = os.path.join(output_dir, 'result_total.ill')
@@ -278,8 +279,8 @@ def build_cmd_rmtxop(radiance_project_dir, radiance_surface_key, step):
 
 
 def create_primitive_sun(radiance_project_dir, radiance_surface_key):
-    rad_surface_dir = os.path.join(radiance_project_dir, f"surface_{radiance_surface_key}")
-    scene_dir = os.path.join(rad_surface_dir, "model", "scene")
+    radiance_surface_dir = os.path.join(radiance_project_dir, f"surface_{radiance_surface_key}")
+    scene_dir = os.path.join(radiance_surface_dir, "model", "scene")
     output_file = os.path.join(scene_dir, "suns.rad")
     write_line = "void light solar 0 0 3 1e6 1e6 1e6\n"
 
@@ -307,15 +308,15 @@ def build_cmd_rcalc(cal='reinsrc.cal'):
 
 def build_cmd_rcontrib(radiance_project_dir, radiance_surface_key, cal="reinhart.cal", n_workers=None, rad_params=None):
     cmd = ["rcontrib", "-I+", "-ab", "1"]
-    rad_surface_dir = os.path.join(radiance_project_dir, f"surface_{radiance_surface_key}")
-    output_dir = os.path.join(rad_surface_dir, "outputs", "matrices")
-    utils.directory_creator(output_dir)
+    radiance_surface_dir = os.path.join(radiance_project_dir, f"surface_{radiance_surface_key}")
+    output_dir = os.path.join(radiance_surface_dir, "outputs", "matrices")
+    io.directory_creator(output_dir)
     output_file = os.path.join(output_dir, 'sun_illum.mtx')
 
-    sun_oct = os.path.join(rad_surface_dir, "outputs", "octree", "sun.oct")
+    sun_oct = os.path.join(radiance_surface_dir, "outputs", "octree", "sun.oct")
     # rcontrib -I+ -ab 1 -y 100 -n 16 -ad 256 -lw 1.0e-3 -dc 1 -dt 0 -dj 0 -faf -e MF:6 -f reinhart.cal -b rbin -bn Nrbins -m solar octrees/sunCoefficientsDDS.oct < points.txt > matrices/cds/cdsDDS.mtx
 
-    grid_file = glob.glob(os.path.join(rad_surface_dir, "model", "grid", "*.pts"))[0]
+    grid_file = glob.glob(os.path.join(radiance_surface_dir, "model", "grid", "*.pts"))[0]
     line_count = int(grid_file.split("_")[-1].split("s")[0])
     # lines in grid file
     # line_count = utils.count_lines(grid_file)
@@ -350,28 +351,29 @@ def run_2phase_dds(project, year=2099):
 
 
     ### Part 0
-    print(f"Running Radiance workflow for 2-Phase DDs with {n_workers} workers")
+    print(f" - Running 2-Phase DDS with {n_workers} workers")
+    print(f" - Current surface is {radiance_surface_key}")
     start_time = time.time()
     ## epw2wea with filtering
     # build command
-    print("Initializing the opening weather file.")
+    print(" - Initializing the opening weather file.")
     cmd_epw2wea, output_wea = build_cmd_epw2wea(radiance_project_dir, radiance_surface_key, scenario_tmy)
     # run command
     proc = subprocess.run(cmd_epw2wea, check=True, input=None, stdout=subprocess.PIPE)
     # filter wea
-    time_utils.filter_wea(output_wea, year, analysis_period)
+    temporal.filter_wea(output_wea, year, analysis_period)
 
     ### [Part 1: Total Irradiance, Part 2: Direct Irradiance]
     for n, step in enumerate(["total", "direct"]):
-        print(f"Starting Part {n + 1} ({step}).")
+        print(f" - Starting Part {n + 1} ({step}).")
         ## oconv
-        print(" - oconv")
+        print("     - oconv")
         cmd_oconv, output = build_cmd_oconv(radiance_project_dir, radiance_surface_key, step)
         with open(output, 'w') as fp:
             proc = subprocess.run(cmd_oconv, check=True, input=None, stdout=fp)
 
         ## rfluxmtx
-        print(" - rfluxmtx")
+        print("     - rfluxmtx")
 
         cmd_rfluxmtx, output_file, input_file = build_cmd_rfluxmtx(radiance_project_dir, radiance_surface_key,
                                                                    skyglow_template_file, step,
@@ -386,14 +388,14 @@ def run_2phase_dds(project, year=2099):
 
 
         ## gendaymtx
-        print(" - gendaymtx")
+        print("     - gendaymtx")
         cmd_gendaymtx, output_file = build_cmd_gendaymtx(radiance_project_dir, radiance_surface_key,
                                                          output_wea, step)
         with open(output_file, 'w') as file:
             proc = subprocess.run(cmd_gendaymtx, stderr=subprocess.PIPE, stdout=file, check=True)
 
         ## dctimestep and rmtxop
-        print(" - dctimestep | rmtxop")
+        print("     - dctimestep | rmtxop")
         # First command: dctimestep matrices/dc/illum.mtx skyVectors/NYC.smx
         cmd_dctimestep = build_cmd_dctimestep(radiance_project_dir, radiance_surface_key, step)
         proc_dctimestep = subprocess.Popen(cmd_dctimestep, stdout=subprocess.PIPE)
@@ -407,16 +409,16 @@ def run_2phase_dds(project, year=2099):
 
     ### Part 3: Sun Coefficients
     step = "sun"
-    print(f"Starting Part {3} ({step}).")
+    print(f" - Starting Part {3} ({step}).")
 
     ## Create solar discs sun file
     # Create a primitive sun
-    print(" - create_primitive_sun")
+    print("     - create_primitive_sun")
     prim_sun_file = create_primitive_sun(radiance_project_dir, radiance_surface_key)
     # build comand for count
     cmd_cnt = build_cmd_cnt()
     # build rcalc command
-    print(" - rcalc")
+    print("     - rcalc")
     cmd_rcalc = build_cmd_rcalc()
     # merge and point to file
     full_cmd = " ".join(cmd_cnt) + " | " + " ".join(cmd_rcalc) + f" >> {prim_sun_file}"
@@ -424,13 +426,13 @@ def run_2phase_dds(project, year=2099):
     subprocess.run(full_cmd, shell=True)
 
     ## Run oconv
-    print(" - oconv")
+    print("     - oconv")
     cmd_oconv, output = build_cmd_oconv(radiance_project_dir, radiance_surface_key, step)
     with open(output, 'w') as fp:
         proc = subprocess.run(cmd_oconv, check=True, input=None, stdout=fp)
 
     ## Run rcontrib
-    print(" - rcontrib")
+    print("     - rcontrib")
     cmd_rcontrib, output_file, input_file = build_cmd_rcontrib(radiance_project_dir, radiance_surface_key,
                                                                n_workers=n_workers,
                                                                rad_params=rcontrib_rad_params)
@@ -441,14 +443,14 @@ def run_2phase_dds(project, year=2099):
         fp.write(proc.stdout)
 
     ## Run gendaymtx
-    print(" - gendaymtx")
+    print("     - gendaymtx")
     cmd_gendaymtx, output_file = build_cmd_gendaymtx(radiance_project_dir, radiance_surface_key,
                                                      output_wea, step)
     with open(output_file, 'w') as file:
         subprocess.run(cmd_gendaymtx, stderr=subprocess.PIPE, stdout=file, check=True)
 
     ## dctimestep and rmtxop for total irradiance
-    print(" - dctimestep | rmtxop")
+    print("     - dctimestep | rmtxop")
     # First command: dctimestep matrices/dc/illum.mtx skyVectors/NYC.smx
     cmd_dctimestep = build_cmd_dctimestep(radiance_project_dir, radiance_surface_key, step)
     proc_dctimestep = subprocess.Popen(cmd_dctimestep, stdout=subprocess.PIPE)
@@ -464,17 +466,17 @@ def run_2phase_dds(project, year=2099):
 def ill_to_df(project):
     radiance_project_dir = project.RADIANCE_DIR
     radiance_surface_key = project.analysis_active_surface
-    lux_to_wattm2 = 0.0079
-    rad_surface_dir = os.path.join(radiance_project_dir, f"surface_{radiance_surface_key}")
-    output_dir = os.path.join(rad_surface_dir, "outputs", "results")
+    lux_to_wattm2 = constants.lux_to_wattm2
+    radiance_surface_dir = os.path.join(radiance_project_dir, f"surface_{radiance_surface_key}")
+    output_dir = os.path.join(radiance_surface_dir, "outputs", "results")
 
     filepath_total = os.path.join(output_dir, 'result_total.ill')
     filepath_direct = os.path.join(output_dir, 'result_direct.ill')
     filepath_sun = os.path.join(output_dir, 'result_sun.ill')
 
-    df_total = utils.read_ill(filepath_total)
-    df_direct = utils.read_ill(filepath_direct)
-    df_sun = utils.read_ill(filepath_sun)
+    df_total = io.read_ill(filepath_total)
+    df_direct = io.read_ill(filepath_direct)
+    df_sun = io.read_ill(filepath_sun)
 
     indirect_illuminance = df_total - df_direct
 
@@ -482,22 +484,21 @@ def ill_to_df(project):
     direct = direct.astype("float").round(2)
     diffuse = indirect_illuminance * lux_to_wattm2
     diffuse = diffuse.astype("float").round(2)
-    diffuse = pd.DataFrame(np.where(diffuse < 0, 0, diffuse))
+    diffuse = pd.DataFrame(np.where(diffuse < 0, direct*0.01, diffuse))
     return direct, diffuse
 
 
 def save_irradiance_results(project):
-    print("Saving Irradiance results")
+    print(" - Saving Irradiance results")
     direct, diffuse = ill_to_df(project)
 
     start_time = time.time()
     project.get_irradiance_results()
-
     feather.write_feather(direct, project.DIRECT_IRRAD_FILE, compression='lz4')
     end_time = time.time()
-    print(f"Direct sensor data saved in compressed format, time={round(end_time-start_time,0)}-seconds.")
+    print(f"    - Direct sensor data saved in compressed format, time={round(end_time-start_time,0)}-seconds.")
 
     start_time = time.time()
     feather.write_feather(diffuse, project.DIFFUSE_IRRAD_FILE, compression='lz4')
     end_time = time.time()
-    print(f"Diffuse sensor data saved in compressed format, time={round(end_time-start_time,0)}-seconds.")
+    print(f"    - Diffuse sensor data saved in compressed format, time={round(end_time-start_time,0)}-seconds.")

@@ -1,7 +1,7 @@
 import pandas as pd
 import proplot as pplt
 import numpy as np
-from workbench.utilities import utils, circuits
+from workbench.utilities import general, circuits
 
 
 def plot_curves(i_arrs, v_arrs, module_params, labels='label', colors='k', title=None, linewidth=1, linestyle='solid', fs=(5, 3),

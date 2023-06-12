@@ -3,9 +3,9 @@ import numpy as np
 import multiprocessing as mp
 from tqdm import notebook
 from workbench.host import module_mapping as ipv_mm
-from workbench.solver import calculations
+from workbench.old_solver import calculations
 from workbench.host import host
-from workbench.utilities import circuits, utils, time_utils
+from workbench.utilities import circuits, general, temporal
 import time
 import copy
 import pandas as pd
@@ -60,7 +60,7 @@ def main(panelizer_object, string, module_dict, pv_cells_xyz_arr, tmy_location, 
         # module_dict, surface, string, module, cell_area, cell_params, hoy_chunk
         mp_results = pool.starmap(panelizer.compile_system_single_core, args)
         # print("    Result Gathered")
-        time.sleep(0.5)
+        temporal.sleep(0.5)
         pool.close()
         # print("    Pool closed")
         pool.join()

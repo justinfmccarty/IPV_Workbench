@@ -1,6 +1,6 @@
 from workbench.host import host
-from workbench.solver import simulations
-from workbench.utilities import utils, time_utils, circuits
+from workbench.old_solver import simulations
+from workbench.utilities import general, temporal, circuits
 
 import numpy as np
 

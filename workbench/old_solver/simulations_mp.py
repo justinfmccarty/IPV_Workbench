@@ -3,9 +3,9 @@ import numpy as np
 import multiprocess as mp
 from tqdm import notebook
 from workbench.host import module_mapping as ipv_mm
-from workbench.solver import calculations
+from workbench.old_solver import calculations
 from workbench.host import host
-from workbench.utilities import circuits, utils, time_utils
+from workbench.utilities import circuits, general, temporal
 import time
 import copy
 import pandas as pd

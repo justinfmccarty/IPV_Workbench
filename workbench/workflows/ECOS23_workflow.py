@@ -2,9 +2,9 @@ import copy
 import os
 import time
 import pandas as pd
-from workbench.devices import devices
+from workbench.device import cell_devices
 from workbench.host import host
-from workbench.utilities import utils
+from workbench.utilities import general
 from workbench.host import results_writers as ipv_results
 import numpy as np
 from tqdm import tqdm
@@ -37,10 +37,10 @@ def run_building(project_folder, cell_technology, orientation, front_cover, buil
         return None
 
     # run the major simulation
-    print("     Starting module solver...")
+    print("     Starting module old_solver...")
     solver_start = time.time()
     panelizer.solve_object_module_iv(panelizer_object, mp=True)
-    print(f"     Module solver finished in {round(time.time() - solver_start, 1)} seconds")
+    print(f"     Module old_solver finished in {round(time.time() - solver_start, 1)} seconds")
 
     # transfer necessary data between levels
     panelizer_object.transfer_initial()

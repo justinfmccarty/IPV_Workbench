@@ -1,7 +1,7 @@
 from pvlib import pvsystem, singlediode
 import numpy as np
 
-from workbench.utilities import circuits, utils
+from workbench.utilities import circuits, general
 
 
 def solve_iv_curve(parameters, Geff, Tcell, ivcurve_pnts=1000):

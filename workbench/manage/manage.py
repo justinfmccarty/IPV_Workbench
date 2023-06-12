@@ -1,48 +1,48 @@
 import glob
 import os
-import subprocess
-
 import pandas as pd
 import pathlib
 import shutil
 import pvlib
 import configparser
-from workbench.utilities import utils, config_utils, time_utils
+from workbench.utilities import general, config_utils, temporal, io
 
 
-def initiate_project(parent_directory, project_name, project_epw, device_name, module_orientation):
+def initiate_project(parent_directory, project_name, project_epw, device_id):
     """
+
 
     :param parent_directory: the directory within which to create a folder to hold the project inputs and outputs
     :param project_name: the name of the project which will be used to create the folder in the parent_directory
     :param project_epw: a project-specific EPW file located somewhere within your file directory
+    :param module_orientation: the orientation of the modules in the array (landscape or portrait)
+    :param device_if: the name of the solar device as specified in the cell_module_datasheet.csv
     :return: file path to the newly created configuration file
     """
     project_directory = os.path.join(parent_directory, project_name)
-    utils.directory_creator(project_directory)
+    io.directory_creator(project_directory)
     default_config = os.path.join(pathlib.Path(__file__).parent,'default.config')
     new_config = os.path.join(project_directory, f"{project_name}.config")
     if os.path.exists(new_config):
         pass
     else:
-        utils.copy_file(default_config, new_config)
+        io.copy_file(default_config, new_config)
 
     config_utils.edit_cfg_file(new_config, 'management', 'parent_dir', parent_directory)
     config_utils.edit_cfg_file(new_config, 'management', 'project_name', project_name)
     config_utils.edit_cfg_file(new_config, 'management', 'base_epw', project_epw)
     config_utils.edit_cfg_file(new_config, 'management', 'tmy_name', pathlib.Path(project_epw).name)
 
-    tmy_location = utils.tmy_location(project_epw)
+    tmy_location = general.tmy_location(project_epw)
     config_utils.edit_cfg_file(new_config, 'management', 'latitude', tmy_location['lat'])
     config_utils.edit_cfg_file(new_config, 'management', 'longitude', tmy_location['lon'])
     config_utils.edit_cfg_file(new_config, 'management', 'elevation', tmy_location['elevation'])
     config_utils.edit_cfg_file(new_config, 'management', 'utc', tmy_location['utc'])
 
-    timezone = time_utils.get_timezone(tmy_location['lat'], tmy_location['lon'])
+    timezone = temporal.get_timezone(tmy_location['lat'], tmy_location['lon'])
     config_utils.edit_cfg_file(new_config, 'management', 'timezone', timezone)
 
-    config_utils.edit_cfg_file(new_config, 'analysis', 'device_name', device_name)
-    config_utils.edit_cfg_file(new_config, 'analysis', 'module_orientation', module_orientation)
+    config_utils.edit_cfg_file(new_config, 'analysis', 'device_id', device_id)
 
     return new_config
 
@@ -65,53 +65,53 @@ class Project:
 
         # inputs
         self.INPUTS_DIR = os.path.join(self.PROJECT_DIR, "inputs")
-        utils.directory_creator(self.INPUTS_DIR)
+        io.directory_creator(self.INPUTS_DIR)
         ## host data
         self.HOSTS_DIR = os.path.join(self.INPUTS_DIR, "hosts")
-        utils.directory_creator(self.HOSTS_DIR)
+        io.directory_creator(self.HOSTS_DIR)
         self.HOST_DIR = os.path.join(self.HOSTS_DIR, self.management_host_name)
-        utils.directory_creator(self.HOST_DIR)
+        io.directory_creator(self.HOST_DIR)
         self.SCEN_DIR = os.path.join(self.HOST_DIR, self.management_scenario_name)
-        utils.directory_creator(self.SCEN_DIR)
+        io.directory_creator(self.SCEN_DIR)
         self.GEOMETRY_DIR = os.path.join(self.SCEN_DIR, "geometry")
-        utils.directory_creator(self.GEOMETRY_DIR)
+        io.directory_creator(self.GEOMETRY_DIR)
         self.PANELIZER_DIR = os.path.join(self.SCEN_DIR, "panelizer")
-        utils.directory_creator(self.PANELIZER_DIR)
+        io.directory_creator(self.PANELIZER_DIR)
         self.STRINGER_DIR = os.path.join(self.SCEN_DIR, "stringer")
-        utils.directory_creator(self.STRINGER_DIR)
+        io.directory_creator(self.STRINGER_DIR)
 
         ### radiance scene
         self.RADIANCE_DIR = os.path.join(self.SCEN_DIR, "radiance")
-        utils.directory_creator(self.RADIANCE_DIR)
+        io.directory_creator(self.RADIANCE_DIR)
 
         ### loads data
         self.HOST_LOADS_DIR = os.path.join(self.SCEN_DIR, "loads")
-        utils.directory_creator(self.HOST_LOADS_DIR)
+        io.directory_creator(self.HOST_LOADS_DIR)
         self.HOST_STATIONARY_LOADS = os.path.join(self.HOST_LOADS_DIR, "stationary.csv")
         self.HOST_MOBILITY_LOADS = os.path.join(self.HOST_LOADS_DIR, "mobility.csv")
 
 
         ## shared data between scenarios, objects
         self.SHARED_DIR = os.path.join(self.INPUTS_DIR, "shared")
-        utils.directory_creator(self.SHARED_DIR)
+        io.directory_creator(self.SHARED_DIR)
         ### log file
         self.LOG_FILE = os.path.join(self.PROJECT_DIR, 'log_file.txt')
         if os.path.exists(self.LOG_FILE):
             pass
         else:
-            utils.create_log_file(self.LOG_FILE)
+            io.create_log_file(self.LOG_FILE)
 
         ### tmy data
         self.TMY_DIR = os.path.join(self.SHARED_DIR, 'tmy')
-        utils.directory_creator(self.TMY_DIR)
+        io.directory_creator(self.TMY_DIR)
         self.TMY_FILE = os.path.join(self.TMY_DIR, f"{self.management_scenario_name}.epw")
         if self.management_base_epw is None:
             default_epw_file = os.path.join(library_root, "template_files", "zurich_2001_2021.epw")
-            utils.copy_file(default_epw_file, self.TMY_FILE)
+            io.copy_file(default_epw_file, self.TMY_FILE)
             self.management_base_epw = default_epw_file
             self.edit_cfg_file('management', 'base_epw', self.management_base_epw)
         else:
-            utils.copy_file(self.management_base_epw, self.TMY_FILE)
+            io.copy_file(self.management_base_epw, self.TMY_FILE)
         self.SUN_UP_FILE = os.path.join(self.TMY_DIR, "sun-up-hours.txt")
 
         if os.path.exists(self.SUN_UP_FILE):
@@ -119,7 +119,7 @@ class Project:
         else:
             # print("Universal sun file missing. Creating from project location.")
             self.create_sun_file()
-        sun_up, sun_hours = utils.create_sun_mask(self.SUN_UP_FILE)
+        sun_up, sun_hours = general.create_sun_mask(self.SUN_UP_FILE)
         self.sunup_array = sun_hours['HOY'].values
         self.sundown_array = sun_up[sun_up['Sunny'] == False]['HOY'].values
 
@@ -127,24 +127,24 @@ class Project:
         ### device data
 
         self.MODULE_CELL_DIR = os.path.join(self.SHARED_DIR, "cell_module_data")
-        utils.directory_creator(self.MODULE_CELL_DIR)
+        io.directory_creator(self.MODULE_CELL_DIR)
         self.module_cell_data = os.path.join(self.MODULE_CELL_DIR, "cell_module_datasheets.csv")
         if os.path.exists(self.module_cell_data):
             pass
         else:
-            default_module_data = os.path.join(library_root, "devices", "default_devices", "cell_module_datasheets.csv")
-            utils.copy_file(default_module_data, self.module_cell_data)
+            default_module_data = os.path.join(library_root, "device", "default_devices", "cell_module_datasheets.csv")
+            io.copy_file(default_module_data, self.module_cell_data)
         self.cec_data = os.path.join(self.MODULE_CELL_DIR, "cec_database_local.csv")
         if os.path.exists(self.cec_data):
             pass
         else:
-            default_module_data = os.path.join(library_root, "devices", "default_devices", "cec_database_local.csv")
-            utils.copy_file(default_module_data, self.cec_data)
+            default_module_data = os.path.join(library_root, "device", "default_devices", "cec_database_local.csv")
+            io.copy_file(default_module_data, self.cec_data)
 
         self.MAPS_DIR = os.path.join(self.MODULE_CELL_DIR, "map_files")
-        utils.directory_creator(self.MAPS_DIR)
+        io.directory_creator(self.MAPS_DIR)
 
-        default_maps = os.path.join(library_root, "devices", "default_devices", "map_files")
+        default_maps = os.path.join(library_root, "device", "default_devices", "map_files")
         self.MAP_FILES = glob.glob(os.path.join(default_maps, "*.xls*"))
 
         for map_file in self.MAP_FILES:
@@ -153,63 +153,63 @@ class Project:
             if os.path.exists(dest_map):
                 pass
             else:
-                utils.copy_file(map_file, dest_map)
+                io.copy_file(map_file, dest_map)
 
         # outputs
         self.OUTPUTS_DIR = os.path.join(self.PROJECT_DIR, "outputs")
-        utils.directory_creator(self.OUTPUTS_DIR)
+        io.directory_creator(self.OUTPUTS_DIR)
 
         self.HOST_RESULTS = os.path.join(self.OUTPUTS_DIR, self.management_host_name)
-        utils.directory_creator(self.HOST_RESULTS)
+        io.directory_creator(self.HOST_RESULTS)
         self.SCEN_RESULTS = os.path.join(self.HOST_RESULTS, self.management_scenario_name)
-        utils.directory_creator(self.SCEN_RESULTS)
+        io.directory_creator(self.SCEN_RESULTS)
         self.POWER_RESULTS_DIR = os.path.join(self.SCEN_RESULTS, "power")
-        utils.directory_creator(self.POWER_RESULTS_DIR)
-        self.LCA_RESULTS_DIR = os.path.join(self.SCEN_RESULTS, "lca")
-        utils.directory_creator(self.LCA_RESULTS_DIR)
+        io.directory_creator(self.POWER_RESULTS_DIR)
+        self.LCA_RESULTS_DIR = os.path.join(self.SCEN_RESULTS, "old_lca")
+        io.directory_creator(self.LCA_RESULTS_DIR)
         self.LCCA_RESULTS_DIR = os.path.join(self.SCEN_RESULTS, "lcca")
-        utils.directory_creator(self.LCCA_RESULTS_DIR)
-        self.DEVICES_RESULTS_DIR = os.path.join(self.SCEN_RESULTS, "devices")
-        utils.directory_creator(self.DEVICES_RESULTS_DIR)
+        io.directory_creator(self.LCCA_RESULTS_DIR)
+        self.DEVICES_RESULTS_DIR = os.path.join(self.SCEN_RESULTS, "device")
+        io.directory_creator(self.DEVICES_RESULTS_DIR)
         self.IRRADIANCE_RESULTS_DIR = os.path.join(self.SCEN_RESULTS, "irradiance")
-        utils.directory_creator(self.IRRADIANCE_RESULTS_DIR)
+        io.directory_creator(self.IRRADIANCE_RESULTS_DIR)
 
         # self.CUMULATIVE_RESULTS_DIR = os.path.join(self.HOSTS_DIR, "cumulative_results")
-        # utils.directory_creator(self.CUMULATIVE_RESULTS_DIR)
+        # general.directory_creator(self.CUMULATIVE_RESULTS_DIR)
         # self.CUMULATIVE_RESULTS_DENSE_DIR = os.path.join(self.HOSTS_DIR, "cumulative_condensed")
-        # utils.directory_creator(self.CUMULATIVE_RESULTS_DENSE_DIR)
+        # general.directory_creator(self.CUMULATIVE_RESULTS_DENSE_DIR)
 
         self.COLD_DIR = os.path.join(self.HOST_DIR, "cold_storage")
 
-        utils.directory_creator(self.COLD_DIR)
+        io.directory_creator(self.COLD_DIR)
         if self.management_scenario_name == None:
             scenario_name = 'base'
         else:
             scenario_name = self.management_scenario_name
 
         # self.RESULTS_DIR = os.path.join(self.HOST_DIR, "scenario_results", scenario_name)
-        # utils.directory_creator(self.RESULTS_DIR)
+        # general.directory_creator(self.RESULTS_DIR)
         # self.ANNUAL_RESULT_DIR = os.path.join(self.RESULTS_DIR, "annual")
-        # utils.directory_creator(self.ANNUAL_RESULT_DIR)
+        # general.directory_creator(self.ANNUAL_RESULT_DIR)
         # self.TIMESERIES_RESULT_DIR = os.path.join(self.RESULTS_DIR, "timeseries")
-        # utils.directory_creator(self.TIMESERIES_RESULT_DIR)
+        # general.directory_creator(self.TIMESERIES_RESULT_DIR)
 
         # template data
         ## geometry writers
         for file_ext in ["3dm", "gh"]:
             src = os.path.join(library_root, "template_files", f"0_workbench_geometry_template.{file_ext}")
             dst = os.path.join(self.GEOMETRY_DIR, f"0_workbench_geometry_template.{file_ext}")
-            utils.copy_file(src, dst)
+            io.copy_file(src, dst)
 
         # ## radiance writer
         # src = os.path.join(library_root, "template_files", f"0_workbench_radiance_writer_template.gh")
         # dst = os.path.join(self.GEOMETRY_DIR, f"0_workbench_radiance_writer_template.gh")
-        # utils.copy_file(src, dst)
+        # general.copy_file(src, dst)
 
         ## panelizer
         src = os.path.join(library_root, "template_files", f"1_workbench_panelizer_template.gh")
         dst = os.path.join(self.GEOMETRY_DIR, f"1_workbench_panelizer_template.gh")
-        utils.copy_file(src, dst)
+        io.copy_file(src, dst)
 
         ## radiance files
         self.skyglow_template = os.path.join(library_root, "template_files", "skyglow.rad")
@@ -222,9 +222,9 @@ class Project:
     def get_irradiance_results(self):
 
         active_surface = f"surface_{self.analysis_active_surface}"
-        utils.directory_creator(os.path.join(self.IRRADIANCE_RESULTS_DIR, active_surface))
-        self.DIRECT_IRRAD_FILE = os.path.join(self.IRRADIANCE_RESULTS_DIR, active_surface, "direct.feather")
-        self.DIFFUSE_IRRAD_FILE = os.path.join(self.IRRADIANCE_RESULTS_DIR, active_surface, "diffuse.feather")
+        io.directory_creator(os.path.join(self.IRRADIANCE_RESULTS_DIR, active_surface))
+        self.DIRECT_IRRAD_FILE = os.path.join(self.IRRADIANCE_RESULTS_DIR, active_surface, "direct.lz4")
+        self.DIFFUSE_IRRAD_FILE = os.path.join(self.IRRADIANCE_RESULTS_DIR, active_surface, "diffuse.lz4")
 
     def log(self, runtime, simulation_type, front_cover=None):
         not_relevant = 'NA'
@@ -242,19 +242,13 @@ class Project:
             rad_par = not_relevant
             n_workers = self.analysis_n_workers
             n_points = not_relevant
-        entry = f"{self.management_scenario_name},{self.analysis_device_name},{self.analysis_module_orientation}," \
+        entry = f"{temporal.current_time()},{self.management_scenario_name},{self.analysis_device_id}," \
                 f"{front_cover},{self.management_host_name}_{self.analysis_active_surface},{simulation_type}," \
-                f"{n_negatives},{n_workers},{n_points},{rad_par},{runtime}"
+                f"{n_negatives},{n_workers},{n_points},{rad_par},{runtime}\n"
         with open(self.LOG_FILE, "a") as fp:
             fp.write(entry)
 
-
-    def edit_cfg_file(self, section, key, new_value):
-        self.config.set(section, key, str(new_value))
-
-        # Writing our configuration file to 'example.ini'
-        with open(self.config_file_path, 'w') as configfile:
-            self.config.write(configfile)
+    def update_cfg(self):
         self.config = configparser.ConfigParser()
         self.config.read(self.config_file_path)
         for section in self.config.sections():
@@ -262,6 +256,12 @@ class Project:
                 value_in = self.config[section][k]
                 formatted_value = config_utils.format_config_item(section, k, value_in)
                 self.__setattr__(f"{section}_{k}", formatted_value)
+
+    def edit_cfg_file(self, section, key, new_value):
+        self.config.set(section, key, str(new_value))
+        with open(self.config_file_path, 'w') as configfile:
+            self.config.write(configfile)
+        self.update_cfg()
 
     def create_sun_file(self):
         solpos = pvlib.solarposition.get_solarposition(

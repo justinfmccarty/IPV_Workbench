@@ -1,8 +1,6 @@
 import configparser
 import pathlib
 
-
-
 def format_config_item(section, key, value):
 
     config_dtypes = {'management': {'project_name': 'str',
@@ -19,8 +17,7 @@ def format_config_item(section, key, value):
                                     'base_epw': 'path',
                                     'tmy_name': 'str',
                                     'timezone': 'str'},
-                     'analysis': {'device_name': 'str',
-                                  'module_orientation': 'str',
+                     'analysis': {'device_id': 'str',
                                   'analysis_period': 'str',
                                   'active_surface': 'str',
                                   'n_workers': 'int'},
@@ -28,7 +25,8 @@ def format_config_item(section, key, value):
                                     'grid_y_mm': 'float',
                                     'radiance_param_rflux': 'str',
                                     'radiance_param_rcontrib': 'str',
-                                    'n_workers': 'int'},
+                                    'n_workers': 'int',
+                                    'store_radiance': 'bool'},
                      }
 
     if value == 'None':

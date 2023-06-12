@@ -2,8 +2,9 @@ from pvlib import pvsystem, singlediode
 import numpy as np
 import multiprocess as mp
 
-from workbench.solver import calculations
-from workbench.utilities import circuits, utils, time_utils
+import workbench.utilities.temporal
+from workbench.old_solver import calculations
+from workbench.utilities import circuits, general, temporal
 import time
 
 
@@ -105,11 +106,11 @@ def run_mp_simulation(panelizer_object, surface, string, module):
     total_timesteps = len(panelizer_object.all_hoy)
     module_dict = panelizer_object.get_dict_instance([surface, string, module]).copy()
     ncpu = panelizer_object.ncpu
-    hoy_chunks = time_utils.create_timestep_chunks(total_timesteps, ncpu)
+    hoy_chunks = workbench.utilities.time.create_timestep_chunks(total_timesteps, ncpu)
     cell_area = panelizer_object.cell.cell_area
     cell_params = panelizer_object.cell.parameters_dict
 
-    time_start = time.time()
+    time_start = temporal.time()
 
     with mp.Pool(processes=ncpu) as pool:
         print("    Pool Opened")
@@ -130,7 +131,7 @@ def run_mp_simulation(panelizer_object, surface, string, module):
         pool.join()
         print("    Pool joined")
 
-    time_end = time.time()
+    time_end = temporal.time()
     print(f"Time elapsed: {round(time_end - time_start, 2)}s")
     return result
 

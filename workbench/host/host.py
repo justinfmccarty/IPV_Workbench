@@ -1,30 +1,28 @@
-import pathlib
-import shutil
 import time
-from workbench.utilities import utils, circuits, time_utils
-from workbench.solver import calculations as ipv_calc, compile_mp, topology_solver
-from workbench.solver import simulations, simple_power_models
-from workbench.devices import devices
-from workbench.host import mapping_irradiance as ipv_irrad
-from workbench.host import module_mapping as ipv_mm
 import os
 import numpy as np
 import pandas as pd
 import multiprocessing as mp
-import glob
+from workbench.utilities import general, circuits, temporal, io, multi
+from workbench.old_solver import calculations as ipv_calc, compile_mp, topology_solver
+from workbench.old_solver import simulations
+from workbench.device import cell_devices, module_devices
+from workbench.irradiance import method_effective_irradiance as ipv_irrad
+from workbench.host import module_mapping as ipv_mm
+from workbench.generation import method_simple_power
 
 
 class Host:
-    def __init__(self, config, locator):
+    def __init__(self, project):
 
-        self.config = config
-        self.locator = locator
+        self.project = project
         self.cell = None
-        self.module = f"{self.locator.analysis_device_name}_{self.locator.analysis_module_orientation}"
+        self.module = self.project.analysis_device_id
         self.topology = None
-        self.tmy_dataframe = None
+        self.tmy_dataframe = io.read_epw(self.project.TMY_FILE)
+        self.tmy_location = general.tmy_location(self.project.TMY_FILE)
         self.analysis_period = (None, None, None)  # start, end, increment
-        self.all_hoy = None
+        self.all_hoy = temporal.datetime_index_to_hoy_array(self.tmy_dataframe.index)
         self.annual_hoy = np.arange(0, 8760, 1)
         self.ncpu = mp.cpu_count() - 1
         self.multiprocess = True
@@ -35,10 +33,9 @@ class Host:
         self.hourly_resolution = None
 
         # v1
-        self.raw_panelizer = f"{self.module}_solar_glass_{self.locator.management_host_name}_raw.pickle"
-        self.panelizer_file = os.path.join(self.locator.SCEN_DIR, 'panelizer', self.raw_panelizer)
+        self.raw_panelizer = f"{self.module}_solar_glass_{self.project.management_host_name}_raw.pickle"
+        self.panelizer_file = os.path.join(self.project.SCEN_DIR, 'panelizer', self.raw_panelizer)
         self.set_panelizer_dict()
-
 
     def set_panelizer_dict(self):
         # print("Setting dict from raw panelizer file")
@@ -51,7 +48,7 @@ class Host:
             if os.path.exists(self.panelizer_file):
                 self.input_type = 'file'
                 self.file_name = self.panelizer_file.split(os.sep)[-1].split(".")[0]
-                self.panelizer_dict = utils.read_pickle(self.panelizer_file)
+                self.panelizer_dict = io.read_pickle(self.panelizer_file)
             else:
                 print(self.panelizer_file)
                 print("Input detected as string but file path does not exist.")
@@ -70,7 +67,7 @@ class Host:
     #     utils.directory_creator(self.TMY_DIR)
     #     self.wea_file = os.path.join(self.TMY_DIR, f"{self.analysis_location}_{self.analysis_year}.wea")
     #     self.tmy_file = os.path.join(self.TMY_DIR, f"{self.analysis_location}_{self.analysis_year}.epw")
-    #     self.tmy_dataframe = utils.tmy_to_dataframe(self.tmy_file)
+    #     self.tmy_dataframe = utils.read_epw(self.tmy_file)
     #     self.tmy_location = utils.tmy_location(self.tmy_file)
 
     def correct_maps(self):
@@ -81,16 +78,16 @@ class Host:
                     modules = self.get_modules(surface, string)
                     for module in modules:
                         mod_dict = self.get_dict_instance([surface, string, module])
-                        mod_dict['Maps']['Diodes'] = utils.flip_maps(mod_dict['Maps']['Diodes'])
-                        mod_dict['Maps']['Submodules'] = utils.flip_maps(mod_dict['Maps']['Submodules'])
-                        mod_dict['Maps']['Subcells'] = utils.flip_maps(mod_dict['Maps']['Subcells'])
+                        mod_dict['Maps']['Diodes'] = general.flip_maps(mod_dict['Maps']['Diodes'])
+                        mod_dict['Maps']['Submodules'] = general.flip_maps(mod_dict['Maps']['Submodules'])
+                        mod_dict['Maps']['Subcells'] = general.flip_maps(mod_dict['Maps']['Subcells'])
 
     def set_analysis_period(self):
         if self.hourly_resolution is None:
             hourly_resolution = 1
         else:
             hourly_resolution = self.hourly_resolution
-        self.all_hoy = time_utils.build_analysis_period(self.sunup_array, hourly_resolution)
+        self.all_hoy = temporal.build_analysis_period(self.sunup_array, hourly_resolution)
 
         return self.all_hoy
 
@@ -101,11 +98,12 @@ class Host:
     #     return self.get_dict_instance([surface])['RESULTSDICT']
 
     def get_surfaces(self):
-        if self.exclude_surfaces == None:
+        if self.project.management_exclude_surfaces == None:
             self.active_surfaces = list(self.panelizer_dict[self.object_type]['Surfaces'].keys())
         else:
             active_surfaces_temp = list(self.panelizer_dict[self.object_type]['Surfaces'].keys())
-            self.active_surfaces = [srf for srf in active_surfaces_temp if srf not in self.exclude_surfaces]
+            self.active_surfaces = [srf for srf in active_surfaces_temp if
+                                    srf not in self.project.management_exclude_surfaces]
         return self.active_surfaces
 
     def get_strings(self, surface_name):
@@ -172,32 +170,27 @@ class Host:
         elif len(keys) == 1:
             return self.panelizer_dict[self.object_type]['Surfaces'][keys[0]]
         elif len(keys) == 2:
-            if strings_or_modules=='modules':
+            if strings_or_modules == 'modules':
                 return self.panelizer_dict[self.object_type]['Surfaces'][keys[0]]['Modules'][keys[1]]
             else:
                 return self.panelizer_dict[self.object_type]['Surfaces'][keys[0]]['Strings'][keys[1]]
         elif len(keys) == 3:
-            if strings_or_modules=='modules':
+            if strings_or_modules == 'modules':
                 return self.panelizer_dict[self.object_type]['Surfaces'][keys[0]]['Modules'][keys[1]][keys[2]]
             else:
                 return self.panelizer_dict[self.object_type]['Surfaces'][keys[0]]['Strings'][keys[1]][keys[2]]
 
     def solve_module_center_pts(self, surface):
+        start_time = time.time()
         dbt = self.tmy_dataframe['drybulb_C'].values[self.all_hoy]
         psl = self.tmy_dataframe['atmos_Pa'].values[self.all_hoy]
 
-        rad_surface_key = self.get_dict_instance([surface])['Details']['radiance_surface_label']
-        total_ill = \
-            ipv_irrad.load_irradiance_file(self.locator.RADIANCE_DIR, rad_surface_key, "total",
-                                           self.locator.management_scenario_name).values[
-                self.all_hoy]
-        direct_ill = \
-            ipv_irrad.load_irradiance_file(self.locator.RADIANCE_DIR, rad_surface_key, "direct",
-                                           self.locator.management_scenario_name).values[
-                self.all_hoy]
-        diffuse_ill = np.where(total_ill < direct_ill, direct_ill * 0.01, total_ill - direct_ill)
-
-        grid_pts = ipv_irrad.load_grid_file(self.locator.RADIANCE_DIR, rad_surface_key, self.locator.management_scenario_name)
+        radiance_surface_key = self.get_dict_instance([surface])['Details']['radiance_surface_label']
+        direct_irrad = io.load_irradiance_file(self.project, radiance_surface_key, "direct").values[
+            self.all_hoy]
+        diffuse_irrad = io.load_irradiance_file(self.project, radiance_surface_key, "diffuse").values[
+            self.all_hoy]
+        grid_pts = io.load_grid_file(self.project, radiance_surface_key)
         sensor_pts_xyz_arr = grid_pts[['X', 'Y', 'Z']].values
 
         # for string in self.get_strings(surface):
@@ -206,162 +199,80 @@ class Host:
 
         surface_details = self.get_dict_instance([surface])['Details']
 
-        base_parameters = utils.get_cec_data(surface_details['cec_key'], file_path=self.locator.cec_data)
-        custom_module_data = pd.read_csv(self.locator.module_cell_data, index_col='scenario').loc[
-            surface_details['module_type']].to_dict()
+        base_parameters = io.get_cec_data(surface_details['cec_key'], file_path=self.project.cec_data)
+        custom_module_data = pd.read_csv(self.project.module_cell_data, index_col='device_id').loc[
+            surface_details['device_id']].to_dict()
 
         for module in self.get_modules(surface):
             module_dict = self.get_dict_instance([surface, module])
-            module_center = np.stack([module_dict['Details']['center_pt']])
-            module_dict['Parameters'] = devices.build_parameter_dict(module_dict,
-                                                                     custom_module_data,
-                                                                     base_parameters)
-
-            T_noct = module_dict['Parameters']['T_NOCT']
-            nom_eff = module_dict['Parameters']['nom_eff']
-            peak_power = module_dict['Parameters']['actual_capacity_Wp']
-            area_mod = module_dict['Parameters']['actual_module_area_m2']
-            area_cells = module_dict['Parameters']['actual_cell_area_m2']
-            module_normal = module_dict['Details']['normal']
-            gamma_ref = module_dict['Parameters']['gamma_ref']
-
-            G_dir_ann = ipv_irrad.collect_raw_irradiance(module_center, sensor_pts_xyz_arr, direct_ill)
-            G_diff_ann = ipv_irrad.collect_raw_irradiance(module_center, sensor_pts_xyz_arr, diffuse_ill)
-
-            front_cover = module_dict['Layers']['front_film']
-            # calculate the effective irradiance for the year
-            G_eff_ann = ipv_irrad.calculate_effective_irradiance_timeseries(G_dir_ann,
-                                                                            G_diff_ann,
-                                                                            module_normal,
-                                                                            self.all_hoy,
-                                                                            self.locator.TMY_FILE,
-                                                                            psl,
-                                                                            dbt,
-                                                                            front_cover)
-            G_eff_ann = G_eff_ann.flatten()
-            T_cell = ipv_calc.calculate_cell_temperature(G_eff_ann, dbt, T_noct)
-            # P = simple_power_models.module_efficiency_method(nom_eff, area_mod, G_eff_ann, gamma_ref, T_cell)
-            P = np.vectorize(simple_power_models.pv_watts_method)(G_eff_ann, T_cell, peak_power, gamma_ref)
-            area = np.zeros_like(P) + area_cells
+            module_dict['Parameters'] = module_devices.build_parameter_dict(module_dict, custom_module_data, base_parameters)
+            module_area, irradiance_result, power_result = method_simple_power.module_center_pt(module_dict,
+                                                                                                sensor_pts_xyz_arr,
+                                                                                                direct_irrad,
+                                                                                                diffuse_irrad,
+                                                                                                self.all_hoy,
+                                                                                                self.tmy_location,
+                                                                                                psl,
+                                                                                                dbt)
 
             if "center_point" not in module_dict['Yield'].keys():
                 module_dict['Yield']['center_point'] = {"pmp": {},
                                                         "irrad": {},
                                                         'area': {}}
 
-            module_dict['Yield']['center_point']['pmp'] = dict(zip(self.all_hoy, P))
-            module_dict['Yield']['center_point']['irrad'] = dict(zip(self.all_hoy, G_eff_ann * area_mod))
-            module_dict['Yield']['center_point']['area'] = dict(zip(self.all_hoy, area))
+            module_dict['Yield']['center_point']['pmp'] = dict(zip(self.all_hoy, power_result))
+            module_dict['Yield']['center_point']['irrad'] = dict(zip(self.all_hoy, irradiance_result))
+            module_dict['Yield']['center_point']['area'] = dict(zip(self.all_hoy, module_area))
+        total_time = round(time.time() - start_time, 2)
+        self.project.log(total_time, "module-center-point")
 
     def solve_module_cell_pts(self, surface):
+        start_time = time.time()
         dbt = self.tmy_dataframe['drybulb_C'].values[self.all_hoy]
         psl = self.tmy_dataframe['atmos_Pa'].values[self.all_hoy]
 
-        rad_surface_key = self.get_dict_instance([surface])['Details']['radiance_surface_label']
-        total_ill = \
-            ipv_irrad.load_irradiance_file(self.locator.RADIANCE_DIR, rad_surface_key, "total",
-                                           self.locator.management_scenario_name).values[
-                self.all_hoy]
-        direct_ill = \
-            ipv_irrad.load_irradiance_file(self.locator.RADIANCE_DIR, rad_surface_key, "direct",
-                                           self.locator.management_scenario_name).values[
-                self.all_hoy]
-        diffuse_ill = np.where(total_ill < direct_ill, direct_ill * 0.01, total_ill - direct_ill)
-
-        grid_pts = ipv_irrad.load_grid_file(self.locator.RADIANCE_DIR, rad_surface_key, self.locator.management_scenario_name)
+        radiance_surface_key = self.get_dict_instance([surface])['Details']['radiance_surface_label']
+        direct_irrad = io.load_irradiance_file(self.project, radiance_surface_key, "direct").values[
+            self.all_hoy]
+        diffuse_irrad = io.load_irradiance_file(self.project, radiance_surface_key, "diffuse").values[
+            self.all_hoy]
+        grid_pts = io.load_grid_file(self.project, radiance_surface_key)
         sensor_pts_xyz_arr = grid_pts[['X', 'Y', 'Z']].values
 
-        # for string in self.get_strings(surface):
-        #     string_dict = self.get_dict_instance([surface, string])
-        #     string_details = string_dict['DETAILS']
-
-
         surface_details = self.get_dict_instance([surface])['Details']
-        base_parameters = utils.get_cec_data(surface_details['cec_key'], file_path=self.locator.cec_data)
-        custom_module_data = pd.read_csv(self.locator.module_cell_data, index_col='scenario').loc[
-            surface_details['module_type']].to_dict()
+        base_parameters = io.get_cec_data(surface_details['cec_key'], file_path=self.project.cec_data)
+        custom_module_data = pd.read_csv(self.project.module_cell_data, index_col='device_id').loc[
+            surface_details['device_id']].to_dict()
 
         modules = self.get_modules(surface)
         for module_name in modules:
-            module_start = time.time()
             module_dict = self.get_dict_instance([surface, module_name])
             pv_cells_xyz_arr = np.array(self.get_cells_xyz(surface, module_name))
 
-            module_dict['Parameters'] = devices.build_parameter_dict(module_dict, custom_module_data,
-                                                                     base_parameters)
+            module_dict['Parameters'] = module_devices.build_parameter_dict(module_dict, custom_module_data,
+                                                                    base_parameters)
 
-            T_noct = module_dict['Parameters']['T_NOCT']
-            nom_eff = module_dict['Parameters']['nom_eff']
-            peak_power = module_dict['Parameters']['cell_peak_Wp']
-            area_cell = module_dict['Parameters']['one_cell_area_m2']
-            module_area = module_dict['Parameters']['actual_module_area_m2']
-            module_normal = module_dict['Details']['normal']
-            gamma_ref = module_dict['Parameters']['gamma_ref']
-
-            G_dir_ann = ipv_irrad.collect_raw_irradiance(pv_cells_xyz_arr,
-                                                         sensor_pts_xyz_arr,
-                                                         direct_ill)
-
-            G_diff_ann = ipv_irrad.collect_raw_irradiance(pv_cells_xyz_arr,
-                                                          sensor_pts_xyz_arr,
-                                                          diffuse_ill)
-
-            front_cover = module_dict['Layers']['front_film']
-            # calculate the effective irradiance for the year
-            G_eff_ann = ipv_irrad.calculate_effective_irradiance_timeseries(G_dir_ann,
-                                                                            G_diff_ann,
-                                                                            module_normal,
-                                                                            self.all_hoy,
-                                                                            self.locator.TMY_FILE,
-                                                                            psl,
-                                                                            dbt,
-                                                                            front_cover)
-
-            Pmod_results = {}
-            Gmod_results = {}
-            area_results = {}
-            for hoy_n, hoy in enumerate(self.all_hoy):
-                Gmod = G_eff_ann[hoy_n].flatten()
-                Tcells = ipv_calc.calculate_cell_temperature(Gmod, dbt[hoy_n], T_noct)
-
-                # Gmod_total = np.sum(Gmod.flatten()*module_dict['PARAMETERS']['one_cell_area_m2']) / module_dict['PARAMETERS']['actual_module_area_m2']
-                # if Gmod_total < module_dict['PARAMETERS']['minimum_irradiance_module']
-                if np.sum(Gmod < module_dict['Parameters']['minimum_irradiance_cell']) > 0:
-
-                    # print(hoy_n, hoy, time_utils.hoy_to_date(hoy), "Zero Array", np.sum(Gmod))
-                    Pcells = 0
-                else:
-                    # Pcells = simple_power_models.module_efficiency_method(nom_eff,
-                    #                                                         area_cell,
-                    #                                                         G_eff_hoy,
-                    #                                                         gamma_ref,
-                    #                                                         Tcells)
-                    Pcells = np.vectorize(simple_power_models.pv_watts_method)(Gmod, Tcells, peak_power, gamma_ref)
-
-                    Pmod_results[hoy] = np.sum(Pcells)
-
-                area_results[hoy] = module_area
-                # Gmod is originally an array of W/m2 for each cell. Need to convert this array to W by multiply by cell area
-                # then take the sum of irradiance for all the cells
-                # this first statement ftakes the mean of the subcells if necesssary (just like in the simulation)
-                if module_dict['Parameters']['N_subcells'] > 1:
-                    if module_dict['Parameters']['orientation'] == 'portrait':
-                        Gmod = np.mean(Gmod, axis=0)
-                    else:
-                        Gmod = np.mean(Gmod, axis=1)
-                else:
-                    pass
-                Gmod = Gmod * area_cell
-                Gmod_results.update({hoy: np.round(np.sum(Gmod), 1)})
+            module_area, irradiance_result, power_result = method_simple_power.module_cell_pt(module_dict,
+                                                                                              pv_cells_xyz_arr,
+                                                                                              sensor_pts_xyz_arr,
+                                                                                              direct_irrad,
+                                                                                              diffuse_irrad,
+                                                                                              self.all_hoy,
+                                                                                              self.tmy_location,
+                                                                                              psl,
+                                                                                              dbt)
 
             if "cell_point" not in module_dict['Yield'].keys():
                 module_dict['Yield']['cell_point'] = {"pmp": {},
                                                       "irrad": {},
                                                       "area": {}}
 
-            module_dict['Yield']['cell_point']['pmp'] = Pmod_results
-            module_dict['Yield']['cell_point']['irrad'] = Gmod_results
-            module_dict['Yield']['cell_point']['area'] = area_results
+            module_dict['Yield']['cell_point']['pmp'] = power_result
+            module_dict['Yield']['cell_point']['irrad'] = irradiance_result
+            module_dict['Yield']['cell_point']['area'] = module_area
+
+        total_time = round(time.time() - start_time, 2)
+        self.project.log(total_time, "module-cell-point")
 
     def sum_simple_module_results(self, surface, simple_topology):
 
@@ -384,8 +295,6 @@ class Host:
         area = pd.concat(area_results, axis=1).sum(axis=1).rename('area')
 
         return pd.concat([pmp, irrad, area], axis=1)
-        # return pd.concat([reduce(lambda x, y: x.add(y, fill_value=0), module_results_pmp),
-        #                 reduce(lambda x, y: x.add(y, fill_value=0), module_results_irrad)], axis=1)
 
     def calculate_module_curve(self, irradiance_hoy, temperature_hoy, submodule_map, subdiode_map):
         # TODO break apart into constituent pieces
@@ -715,10 +624,10 @@ class Host:
         sub_dict = self.get_dict_instance([surface, string])['MODULES']
 
         for key in string_dict.keys():
-            key_result = utils.gather_sublevel_results(self,
-                                                       sub_dict,
-                                                       self.get_modules(surface, string),
-                                                       key)
+            key_result = general.gather_sublevel_results(self,
+                                                         sub_dict,
+                                                         self.get_modules(surface, string),
+                                                         key)
             string_dict[key].update(key_result)
 
         # recalculate efficiency
@@ -742,10 +651,10 @@ class Host:
             surface_strings_dict = self.get_dict_instance([surface])['STRINGS']
 
             for key in surface_dict.keys():
-                key_result = utils.gather_sublevel_results(self,
-                                                           surface_strings_dict,
-                                                           self.get_strings(surface),
-                                                           key)
+                key_result = general.gather_sublevel_results(self,
+                                                             surface_strings_dict,
+                                                             self.get_strings(surface),
+                                                             key)
                 surface_dict[key].update(key_result)
 
             # recalculate efficiency
@@ -762,10 +671,10 @@ class Host:
         object_dict = self.panelizer_dict[self.object_type]['YIELD'][self.topology]
 
         for key in object_dict.keys():
-            key_result = utils.gather_sublevel_results(self,
-                                                       self.panelizer_dict[self.object_type]['SURFACES'],
-                                                       self.get_surfaces(),
-                                                       key)
+            key_result = general.gather_sublevel_results(self,
+                                                         self.panelizer_dict[self.object_type]['SURFACES'],
+                                                         self.get_surfaces(),
+                                                         key)
             object_dict[key].update(key_result)
 
         # recalculate efficieny
@@ -791,7 +700,7 @@ class Host:
             _type_: dataframe
         """
 
-        result_dict = self.get_dict_instance(search_list)['YIELD'][topology]
+        result_dict = self.get_dict_instance(search_list)['Yield'][topology]
 
         result_series_l = []
 
@@ -809,10 +718,11 @@ class Host:
 
         results_df = pd.concat(result_series_l, axis=1).sort_index()
 
-        idx_start = time_utils.hoy_to_date(results_df.index[0])
-        idx_end = time_utils.hoy_to_date(results_df.index[-1])
+        idx_start = temporal.hoy_to_date(results_df.index[0])
+        idx_end = temporal.hoy_to_date(results_df.index[-1])
 
-        results_df.set_index(time_utils.create_datetime(start=str(idx_start), end=str(idx_end)), inplace=True)
+        results_df.set_index(temporal.create_datetime(start=str(idx_start), end=str(idx_end)),
+                             inplace=True)
 
         rename_dict = {"imp": "Current at MPPT (amperes)",
                        "vmp": "Voltage at MPPT (volt)",
@@ -836,7 +746,7 @@ class Host:
 
 def solve_object_module_iv(panelizer_object, write_system=False, mp=False, display_print=False):
     timeseries = panelizer_object.all_hoy
-    tmy_location = utils.tmy_location(panelizer_object.tmy_file)
+    tmy_location = general.tmy_location(panelizer_object.tmy_file)
     dbt = panelizer_object.tmy_dataframe['drybulb_C'].values[timeseries]
     psl = panelizer_object.tmy_dataframe['atmos_Pa'].values[timeseries]
 
@@ -859,7 +769,7 @@ def solve_object_module_iv(panelizer_object, write_system=False, mp=False, displ
                                             panelizer_object.management_scenario_name)
         if display_print == True:
             print("    Completed loading grid and irradiance data.")
-        #TODO refactor this workflow to iterate over all string,module combinations to increase MP performance
+        # TODO refactor this workflow to iterate over all string,module combinations to increase MP performance
         for string in panelizer_object.get_strings(surface):
             if display_print == True:
                 print("     -------------------")
@@ -872,7 +782,7 @@ def solve_object_module_iv(panelizer_object, write_system=False, mp=False, displ
 
             modules = panelizer_object.get_modules(surface, string)
 
-            base_parameters = utils.get_cec_data(string_details['cec_key'], file_path=panelizer_object.cec_data)
+            base_parameters = io.get_cec_data(string_details['cec_key'], file_path=panelizer_object.cec_data)
             custom_module_data = pd.read_csv(panelizer_object.module_cell_data, index_col='scenario').loc[
                 string_details['module_type']].to_dict()
 
@@ -880,7 +790,7 @@ def solve_object_module_iv(panelizer_object, write_system=False, mp=False, displ
             cell_type = ipv_mm.get_cell_type(module_template[0])
             orientation = ipv_mm.get_orientation(module_template[1])
             map_file = [fp for fp in panelizer_object.map_files if f"{cell_type}_{orientation}" in fp][0]
-            default_submodule_map, default_diode_map, default_subcell_map = utils.read_map_excel(map_file)
+            default_submodule_map, default_diode_map, default_subcell_map = io.read_map_excel(map_file)
 
             if mp == False:
                 if display_print == True:
@@ -1049,12 +959,13 @@ def compile_system_multi_core(module_dict_chunk, module_name_chunk, timeseries, 
 
     return module_results
 
+
 def compile_system_multi_core_v2(module_dict_chunk, module_name_chunk, timeseries, tmy_location, dbt, psl,
-                              pv_cells_xyz_arr_chunk, grid_pts, direct_ill_tup, diffuse_ill_tup, base_parameters,
-                              custom_module_data,
-                              default_submodule_map, default_diode_map, default_subcell_map, cell_type):
-    direct_ill = utils.unpack_shared_tuple(direct_ill_tup)
-    diffuse_ill = utils.unpack_shared_tuple(diffuse_ill_tup)
+                                 pv_cells_xyz_arr_chunk, grid_pts, direct_ill_tup, diffuse_ill_tup, base_parameters,
+                                 custom_module_data,
+                                 default_submodule_map, default_diode_map, default_subcell_map, cell_type):
+    direct_ill = multi.unpack_shared_tuple(direct_ill_tup)
+    diffuse_ill = multi.unpack_shared_tuple(diffuse_ill_tup)
 
     module_results = {}
 
@@ -1076,6 +987,7 @@ def compile_system_multi_core_v2(module_dict_chunk, module_name_chunk, timeserie
 
     return module_results
 
+
 def build_module_features(module_dict, timeseries, tmy_location, dbt, psl, pv_cells_xyz_arr, grid_pts, direct_ill,
                           diffuse_ill, base_parameters, custom_module_data, default_submodule_map, default_diode_map,
                           default_subcell_map, cell_type):
@@ -1084,13 +996,13 @@ def build_module_features(module_dict, timeseries, tmy_location, dbt, psl, pv_ce
     if len(pv_cells_xyz_arr.shape) > 2:
         pv_cells_xyz_arr = pv_cells_xyz_arr[0]
 
-    device_parameters = devices.build_parameter_dict(module_dict, custom_module_data, base_parameters)
+    device_parameters = module_devices.build_parameter_dict(module_dict, custom_module_data, base_parameters)
 
     # get direct and diffuse irradiance
     # pv_cells_xyz_arr = np.array(panelizer_object.get_cells_xyz(surface, string, module))
 
     if type(grid_pts) == np.ndarray:
-        sensor_pts_xyz_arr = grid_pts[:,0:3]
+        sensor_pts_xyz_arr = grid_pts[:, 0:3]
     else:
         sensor_pts_xyz_arr = grid_pts[['X', 'Y', 'Z']].values
 
@@ -1246,7 +1158,7 @@ def compile_system_single_core_v2(module_dict, timeseries, dbt, G_eff_ann,
 def build_module_features_v2(module_dict, timeseries, dbt, G_eff_ann,
                              base_parameters, custom_module_data, default_submodule_map, default_diode_map,
                              default_subcell_map, cell_type):
-    device_parameters = devices.build_parameter_dict(module_dict, custom_module_data, base_parameters)
+    device_parameters = module_devices.build_parameter_dict(module_dict, custom_module_data, base_parameters)
 
     # nrows will always be 1 in cdte portrait now due to the changes in grasshopper. this may cause problem
     ncols = device_parameters['n_cols']

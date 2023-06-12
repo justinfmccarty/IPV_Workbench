@@ -3,8 +3,10 @@ import sys
 import os
 import random
 import numpy as np
-from workbench.solver import calculations
-from workbench.utilities import utils
+
+import workbench.utilities.io
+from workbench.old_solver import calculations
+from workbench.utilities import general
 
 
 def read_sample_irradiance(stream):
@@ -145,7 +147,7 @@ def generate_sample_building_dict(n_surfaces, n_strings, n_modules):
 def generate_sample_module_dict(n_rows=6, n_cols=20, module_template='a1'):
     tmy_file = os.path.join(os.path.dirname(__file__),
                             "zurich_2007_2021.epw")
-    tmy_df = utils.tmy_to_dataframe(tmy_file)
+    tmy_df = workbench.utilities.io.read_epw(tmy_file)
     submodule_map, diode_pathways_map = generate_sample_module_maps(
         n_rows, n_cols, module_template)
     module_irrad_direct = generate_sample_module_irrad('direct', n_rows, n_cols)
