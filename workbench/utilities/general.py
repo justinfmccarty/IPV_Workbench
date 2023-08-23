@@ -26,10 +26,13 @@ def collect_raw_irradiance(pv_cells_xyz_arr, sensor_pts_xyz_arr, sensor_pts_irra
         irrad_cell_mean = (sensor_pts_irradiance_arr.T[first] + sensor_pts_irradiance_arr.T[second] +
                            sensor_pts_irradiance_arr.T[third]) / 3
     else:
-        print("The arg 'method' must be specified as either 'closest' 'mean' (mean of nearest 3 points). "
+        print("The arg 'method' must be specified as either 'closest' or 'mean' (mean of nearest 3 points). "
               "Defaulting to closest.")
         first = cdist_arr.argsort()[:, 0]
         irrad_cell_mean = sensor_pts_irradiance_arr.T[first]
+
+
+
 
     return irrad_cell_mean.T
 

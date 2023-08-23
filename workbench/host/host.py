@@ -296,6 +296,29 @@ class Host:
 
         return pd.concat([pmp, irrad, area], axis=1)
 
+    def solve_module_iv_curve(self, surface):
+        start_time = time.time()
+        dbt = self.tmy_dataframe['drybulb_C'].values[self.all_hoy]
+        psl = self.tmy_dataframe['atmos_Pa'].values[self.all_hoy]
+
+        radiance_surface_key = self.get_dict_instance([surface])['Details']['radiance_surface_label']
+        direct_irrad = io.load_irradiance_file(self.project, radiance_surface_key, "direct").values[
+            self.all_hoy]
+        diffuse_irrad = io.load_irradiance_file(self.project, radiance_surface_key, "diffuse").values[
+            self.all_hoy]
+        grid_pts = io.load_grid_file(self.project, radiance_surface_key)
+        sensor_pts_xyz_arr = grid_pts[['X', 'Y', 'Z']].values
+
+        surface_details = self.get_dict_instance([surface])['Details']
+        base_parameters = io.get_cec_data(surface_details['cec_key'], file_path=self.project.cec_data)
+        custom_module_data = pd.read_csv(self.project.module_cell_data, index_col='device_id').loc[
+            surface_details['device_id']].to_dict()
+
+        modules = self.get_modules(surface)
+
+        for module in modules:
+
+
     def calculate_module_curve(self, irradiance_hoy, temperature_hoy, submodule_map, subdiode_map):
         # TODO break apart into constituent pieces
         # TODO add subcell routine

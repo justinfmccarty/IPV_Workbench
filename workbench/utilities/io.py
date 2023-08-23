@@ -2,6 +2,7 @@ import gzip
 import json
 import lzma
 import os
+import pathlib
 import pickle
 import shutil
 import glob
@@ -55,9 +56,12 @@ def read_ill(filepath):
     """
     # this works on honeybee files
     # return pd.read_csv(filepath, delimiter=' ', header=None, dtype='float32').iloc[:, 1:].T.reset_index(drop=True)
-    # df = pd.read_csv(filepath, header=None, skiprows=11, delimiter=' ', dtype='float')
-    df = pd.read_feather(filepath)
-    df = df[range(1, len(df.columns))].round(2)
+    if pathlib.Path(filepath).suffix == ".ill":
+        df = pd.read_csv(filepath, header=None, skiprows=11, delimiter=' ', dtype='float')
+        df = df[range(1, len(df.columns))].round(2)
+    else:
+        df = pd.read_feather(filepath)
+        df = df[range(1, len(df.columns))].round(2)
     return df
 
 

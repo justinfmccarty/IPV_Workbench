@@ -25,7 +25,7 @@ def calc_series(iv_curves, breakdown_voltage, diode_threshold=None, bypass=True)
 
 def assemble_series(I, V, meanIsc, Imax):
     """
-    This is the calc series method used by sunpowers pvmismatch tool
+    This is maodified version of the calc series method used by Sunpower's pvmismatch tool
 
     Calculate IV curve for cells and substrings in series given current and
     voltage in increasing order by voltage, the average short circuit

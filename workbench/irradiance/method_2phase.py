@@ -12,8 +12,8 @@ import pyarrow.feather as feather
 from workbench.utilities import general, temporal, io, constants
 
 
-def change_plastic_material(filepath, line_idx, item_idx, new_name):
-    with open(filepath, "r") as fp:
+def change_plastic_material(og_material_fp, blk_material_fp, line_idx, item_idx, new_name):
+    with open(og_material_fp, "r") as fp:
         material_lines = fp.readlines()
 
     new_line = []
@@ -26,7 +26,7 @@ def change_plastic_material(filepath, line_idx, item_idx, new_name):
     new_line = " ".join(new_line) + "\n"
     material_lines[line_idx] = new_line
 
-    with open(filepath, "w") as fp:
+    with open(blk_material_fp, "w") as fp:
         fp.writelines(material_lines)
 
 def create_black_objects(input_f, output_f):
@@ -42,45 +42,61 @@ def build_cmd_oconv(radiance_project_dir, radiance_surface_key, step):
     io.directory_creator(oct_dir)
 
     object_material_file = os.path.join(radiance_surface_dir, "model", "scene", "envelope.mat")
-    object_file = os.path.join(radiance_surface_dir, "model", "scene", "envelope.rad")
     black_object_material_file = os.path.join(radiance_surface_dir, "model", "scene", "envelope.blk")
-    change_plastic_material(black_object_material_file, 0 , 2, "black")
+    change_plastic_material(object_material_file, black_object_material_file, 0 , 2, "black")
+
+    object_file = os.path.join(radiance_surface_dir, "model", "scene", "envelope.rad")
     black_object_file = os.path.join(radiance_surface_dir, "model", "scene", "envelope_black.rad")
     if os.path.exists(black_object_file):
         pass
     else:
         create_black_objects(object_file, black_object_file)
 
-    glazing_material_file = os.path.join(radiance_surface_dir, "model", "aperture", "aperture.mat")
-    glazing_file = os.path.join(radiance_surface_dir, "model", "aperture", "aperture.rad")
-    black_glazing_material_file = os.path.join(radiance_surface_dir, "model", "aperture", "aperture.blk")
-    change_plastic_material(black_glazing_material_file, 0, 2, "black")
-    black_glazing_file = os.path.join(radiance_surface_dir, "model", "aperture", "aperture_black.rad")
 
-    if os.path.exists(black_glazing_file):
-        pass
+    glazing_material_file = os.path.join(radiance_surface_dir, "model", "aperture", "aperture.mat")
+    if os.path.exists(glazing_material_file):
+        black_glazing_material_file = os.path.join(radiance_surface_dir, "model", "aperture", "aperture.blk")
+        change_plastic_material(glazing_material_file, black_glazing_material_file, 0, 2, "black")
+
+        glazing_file = os.path.join(radiance_surface_dir, "model", "aperture", "aperture.rad")
+        black_glazing_file = os.path.join(radiance_surface_dir, "model", "aperture", "aperture_black.rad")
+
+        if os.path.exists(black_glazing_file):
+            pass
+        else:
+            create_black_objects(glazing_file, black_glazing_file)
     else:
-        create_black_objects(glazing_file, black_glazing_file)
+        pass
 
     sun_file = os.path.join(radiance_surface_dir, "model", "scene", "suns.rad")
 
     if step == "total":
         oct_name = "total.oct"
         output_file = os.path.join(oct_dir, oct_name)
-        cmd += [object_material_file, object_file, glazing_material_file, glazing_file]  # , ">", output_file]
+        if os.path.exists(glazing_material_file):
+            cmd += [object_material_file, object_file, glazing_material_file, glazing_file]  # , ">", output_file]
+        else:
+            cmd += [object_material_file, object_file]  # , ">", output_file]
 
     elif step == "direct":
         oct_name = "direct.oct"
         output_file = os.path.join(oct_dir, oct_name)
-        cmd += [black_object_material_file, black_object_file, glazing_material_file,
-                glazing_file]  # , ">", output_file]
+        if os.path.exists(glazing_material_file):
+            cmd += [black_object_material_file, black_object_file, glazing_material_file,
+                    glazing_file]  # , ">", output_file]
+        else:
+            cmd += [black_object_material_file, black_object_file]
 
     elif step == "sun":
         oct_name = "sun.oct"
         output_file = os.path.join(oct_dir, oct_name)
         if os.path.exists(sun_file):
-            cmd += ["-f", black_object_material_file, black_object_file, sun_file, glazing_material_file,
-                    glazing_file]  # , ">", output_file]
+            if os.path.exists(glazing_material_file):
+                cmd += ["-f", black_object_material_file, black_object_file, sun_file, glazing_material_file,
+                        glazing_file]  # , ">", output_file]
+            else:
+                cmd += ["-f", black_object_material_file, black_object_file, sun_file]
+
         else:
             print(
                 "The file 'suns.rad' is missing. This can be generated from a primiary solar material and then 'rcalc' with a reinhart sky.")
@@ -343,7 +359,7 @@ def run_2phase_dds(project, year=2099):
     radiance_project_dir = project.RADIANCE_DIR
     scenario_tmy = project.TMY_FILE
 
-    analysis_period = project.analysis_analysis_period
+    # analysis_period = project.analysis_period
     skyglow_template_file = project.skyglow_template
     n_workers = project.irradiance_n_workers
     rflux_rad_params = project.irradiance_radiance_param_rflux
@@ -357,11 +373,14 @@ def run_2phase_dds(project, year=2099):
     ## epw2wea with filtering
     # build command
     print(" - Initializing the opening weather file.")
-    cmd_epw2wea, output_wea = build_cmd_epw2wea(radiance_project_dir, radiance_surface_key, scenario_tmy)
-    # run command
-    proc = subprocess.run(cmd_epw2wea, check=True, input=None, stdout=subprocess.PIPE)
-    # filter wea
-    temporal.filter_wea(output_wea, year, analysis_period)
+    if pathlib.Path(scenario_tmy).suffix == ".epw":
+        cmd_epw2wea, output_wea = build_cmd_epw2wea(radiance_project_dir, radiance_surface_key, scenario_tmy)
+        # run command
+        proc = subprocess.run(cmd_epw2wea, check=True, input=None, stdout=subprocess.PIPE)
+        # filter wea
+        # temporal.filter_wea(output_wea, year, analysis_period)
+    else:
+        output_wea = scenario_tmy
 
     ### [Part 1: Total Irradiance, Part 2: Direct Irradiance]
     for n, step in enumerate(["total", "direct"]):

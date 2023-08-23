@@ -332,11 +332,11 @@ def simulation_module_yield(panelizer_object, surface, string, module, hoy):
     panelizer_object.get_diode_map(surface, string, module)
 
     module_irrad = panelizer_object.get_cells_irrad_eff(surface, string, module)
-    full_irrad = utils.expand_ndarray_2d_3d(module_irrad)
+    full_irrad = general.expand_ndarray_2d_3d(module_irrad)
     irrad_hoy = full_irrad[:, :, hoy]
 
     module_temp = panelizer_object.get_cells_temp(surface, string, module)
-    full_temp = utils.expand_ndarray_2d_3d(module_temp)
+    full_temp = general.expand_ndarray_2d_3d(module_temp)
     temp_hoy = full_temp[:, :, hoy]
 
     Gmod = np.sum(irrad_hoy * (panelizer_object.cell.width * panelizer_object.cell.width))
