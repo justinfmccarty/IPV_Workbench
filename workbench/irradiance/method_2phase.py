@@ -47,10 +47,10 @@ def build_cmd_oconv(radiance_project_dir, radiance_surface_key, step):
 
     object_file = os.path.join(radiance_surface_dir, "model", "scene", "envelope.rad")
     black_object_file = os.path.join(radiance_surface_dir, "model", "scene", "envelope_black.rad")
-    if os.path.exists(black_object_file):
-        pass
-    else:
-        create_black_objects(object_file, black_object_file)
+    # if os.path.exists(black_object_file):
+    #     pass
+    # else:
+    create_black_objects(object_file, black_object_file)
 
 
     glazing_material_file = os.path.join(radiance_surface_dir, "model", "aperture", "aperture.mat")
@@ -61,10 +61,10 @@ def build_cmd_oconv(radiance_project_dir, radiance_surface_key, step):
         glazing_file = os.path.join(radiance_surface_dir, "model", "aperture", "aperture.rad")
         black_glazing_file = os.path.join(radiance_surface_dir, "model", "aperture", "aperture_black.rad")
 
-        if os.path.exists(black_glazing_file):
-            pass
-        else:
-            create_black_objects(glazing_file, black_glazing_file)
+        # if os.path.exists(black_glazing_file):
+        #     pass
+        # else:
+        create_black_objects(glazing_file, black_glazing_file)
     else:
         pass
 
