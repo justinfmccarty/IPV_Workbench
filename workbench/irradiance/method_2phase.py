@@ -179,7 +179,7 @@ def build_cmd_rfluxmtx(radiance_project_dir, radiance_surface_key, skyglow_templ
 
     # sender and octree
     cmd += ["-i", f"{octree_file}", "<", f"{grid_file}"]  # , ">", f"{output_file}"]
-
+    # print(cmd)
     return cmd, output_file, grid_file
 
 
@@ -217,18 +217,20 @@ def build_cmd_gendaymtx(radiance_project_dir, radiance_surface_key, wea_file, st
 
     if step == 'total':
         output_file = os.path.join(output_dir, 'sky_total.smx')
-        cmd += ['-m', '1']
+        cmd += ['-m', '1', '-O1']
     elif step == 'direct':
         output_file = os.path.join(output_dir, 'sky_direct.smx')
-        cmd += ['-m', '1', '-d']
+        cmd += ['-m', '1', '-d', '-O1']
     elif step == 'sun':
         output_file = os.path.join(output_dir, 'sky_sun.smx')
-        cmd += ['-5', '0.533', '-d', '-m', '6']
+        cmd += ['-5', '0.533', '-d', '-m', '6', '-O1']
+        
     else:
         print("Arg 'step' must be specified as 'total', 'direct', or 'sun'")
         return TypeError
 
     cmd += [wea_file]
+    # print(cmd)
 
     return cmd, output_file
 
@@ -267,7 +269,7 @@ def build_cmd_rmtxop(radiance_project_dir, radiance_surface_key, step):
     """_summary_
     The three numbers specified after -c convert the irradiance values
     to illuminance [lux] by scaling and combining the result according to the photopic efficiency function.
-    The conversion from lux to W/m2 is applied at the end of the workflow when all result .ill are combined.
+    # The conversion from lux to W/m2 is applied at the end of the workflow when all result .ill are combined.
 
     example: rmtxop -fa -t -c 47.4 119.9 11.6 - > results/dcDDS/dc/annualR.ill
     Args:
@@ -276,7 +278,12 @@ def build_cmd_rmtxop(radiance_project_dir, radiance_surface_key, step):
     """
 
     cmd = ['rmtxop']
-    cmd += ["-fa", "-t", "-c", "47.4", "119.9", "11.6", "-"]
+    # cmd += ["-fa", "-t", "-c", "47.4", "119.9", "11.6", "-"]
+    cr=0.265
+    cg=0.670
+    cb=0.065
+
+    cmd += ["-fa", "-t", "-c", str(cr), str(cg), str(cb), "-"]
     radiance_surface_dir = os.path.join(radiance_project_dir, f"surface_{radiance_surface_key}")
     output_dir = os.path.join(radiance_surface_dir, "outputs", "results")
     io.directory_creator(output_dir)
@@ -378,7 +385,8 @@ def run_2phase_dds(project, year=2099):
         # run command
         proc = subprocess.run(cmd_epw2wea, check=True, input=None, stdout=subprocess.PIPE)
         # filter wea
-        # temporal.filter_wea(output_wea, year, analysis_period)
+        # temporal.filter_wea(
+            # output_wea, year, analysis_period)
     else:
         output_wea = scenario_tmy
 
@@ -499,9 +507,9 @@ def ill_to_df(project):
 
     indirect_illuminance = df_total - df_direct
 
-    direct = df_sun * lux_to_wattm2
+    direct = df_sun# * lux_to_wattm2
     direct = direct.astype("float").round(2)
-    diffuse = indirect_illuminance * lux_to_wattm2
+    diffuse = indirect_illuminance# * lux_to_wattm2
     diffuse = diffuse.astype("float").round(2)
     diffuse = pd.DataFrame(np.where(diffuse < 0, direct*0.01, diffuse))
     return direct, diffuse
