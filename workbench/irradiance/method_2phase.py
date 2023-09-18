@@ -37,7 +37,7 @@ def create_black_objects(input_f, output_f):
 def build_cmd_oconv(radiance_project_dir, radiance_surface_key, step):
     cmd = ['oconv']
 
-    radiance_surface_dir = os.path.join(radiance_project_dir, f"surface_{radiance_surface_key}")
+    radiance_surface_dir = os.path.join(radiance_project_dir, radiance_surface_key)
     oct_dir = os.path.join(radiance_surface_dir, "outputs", "octree")
     io.directory_creator(oct_dir)
 
@@ -135,7 +135,7 @@ def create_skyglow(skyglow_file, resolution, dst):
 def build_cmd_rfluxmtx(radiance_project_dir, radiance_surface_key, skyglow_template, step,
                        n_workers=None, rad_params=None):
     cmd = ["rfluxmtx", "-I+"]
-    radiance_surface_dir = os.path.join(radiance_project_dir, f"surface_{radiance_surface_key}")
+    radiance_surface_dir = os.path.join(radiance_project_dir, radiance_surface_key)
     output_dir = os.path.join(radiance_surface_dir, "outputs", "matrices")
     io.directory_creator(output_dir)
 
@@ -185,7 +185,7 @@ def build_cmd_rfluxmtx(radiance_project_dir, radiance_surface_key, skyglow_templ
 
 def build_cmd_epw2wea(radiance_project_dir, radiance_surface_key, input_epw):
     input_epw = pathlib.Path(input_epw)
-    radiance_surface_dir = os.path.join(radiance_project_dir, f"surface_{radiance_surface_key}")
+    radiance_surface_dir = os.path.join(radiance_project_dir, radiance_surface_key)
     wea_name = input_epw.name.replace(".epw", ".wea")
 
     output_wea = os.path.join(radiance_surface_dir, 'model', wea_name)
@@ -212,7 +212,7 @@ def build_cmd_gendaymtx(radiance_project_dir, radiance_surface_key, wea_file, st
     """
     cmd = ['gendaymtx']
 
-    radiance_surface_dir = os.path.join(radiance_project_dir, f"surface_{radiance_surface_key}")
+    radiance_surface_dir = os.path.join(radiance_project_dir, radiance_surface_key)
     output_dir = os.path.join(radiance_surface_dir, "outputs", "matrices")
 
     if step == 'total':
@@ -242,7 +242,7 @@ def build_cmd_dctimestep(radiance_project_dir, radiance_surface_key, step):
     """
 
     cmd = ['dctimestep']
-    radiance_surface_dir = os.path.join(radiance_project_dir, f"surface_{radiance_surface_key}")
+    radiance_surface_dir = os.path.join(radiance_project_dir, radiance_surface_key)
     matrices_dir = os.path.join(radiance_surface_dir, "outputs", "matrices")
 
     if step == 'total':
@@ -277,7 +277,7 @@ def build_cmd_rmtxop(radiance_project_dir, radiance_surface_key, step):
 
     cmd = ['rmtxop']
     cmd += ["-fa", "-t", "-c", "47.4", "119.9", "11.6", "-"]
-    radiance_surface_dir = os.path.join(radiance_project_dir, f"surface_{radiance_surface_key}")
+    radiance_surface_dir = os.path.join(radiance_project_dir, radiance_surface_key)
     output_dir = os.path.join(radiance_surface_dir, "outputs", "results")
     io.directory_creator(output_dir)
 
@@ -295,7 +295,7 @@ def build_cmd_rmtxop(radiance_project_dir, radiance_surface_key, step):
 
 
 def create_primitive_sun(radiance_project_dir, radiance_surface_key):
-    radiance_surface_dir = os.path.join(radiance_project_dir, f"surface_{radiance_surface_key}")
+    radiance_surface_dir = os.path.join(radiance_project_dir, radiance_surface_key)
     scene_dir = os.path.join(radiance_surface_dir, "model", "scene")
     output_file = os.path.join(scene_dir, "suns.rad")
     write_line = "void light solar 0 0 3 1e6 1e6 1e6\n"
@@ -324,7 +324,7 @@ def build_cmd_rcalc(cal='reinsrc.cal'):
 
 def build_cmd_rcontrib(radiance_project_dir, radiance_surface_key, cal="reinhart.cal", n_workers=None, rad_params=None):
     cmd = ["rcontrib", "-I+", "-ab", "1"]
-    radiance_surface_dir = os.path.join(radiance_project_dir, f"surface_{radiance_surface_key}")
+    radiance_surface_dir = os.path.join(radiance_project_dir, radiance_surface_key)
     output_dir = os.path.join(radiance_surface_dir, "outputs", "matrices")
     io.directory_creator(output_dir)
     output_file = os.path.join(output_dir, 'sun_illum.mtx')
@@ -486,7 +486,7 @@ def ill_to_df(project):
     radiance_project_dir = project.RADIANCE_DIR
     radiance_surface_key = project.analysis_active_surface
     lux_to_wattm2 = constants.lux_to_wattm2
-    radiance_surface_dir = os.path.join(radiance_project_dir, f"surface_{radiance_surface_key}")
+    radiance_surface_dir = os.path.join(radiance_project_dir, radiance_surface_key)
     output_dir = os.path.join(radiance_surface_dir, "outputs", "results")
 
     filepath_total = os.path.join(output_dir, 'result_total.ill')

@@ -24,10 +24,10 @@ def get_cec_data(cec_key=None, file_path=None):
 
 def load_irradiance_file(project, radiance_surface_key, component):
     input_surface_dir = os.path.join(project.management_parent_dir, project.management_project_name, "inputs", "hosts", project.management_host_name,
-                                     project.management_scenario_name, "radiance", f"surface_{radiance_surface_key}")
+                                     project.management_scenario_name, "radiance", f"{radiance_surface_key}")
     wea_filepath = os.path.join(input_surface_dir, "model", f"{project.management_scenario_name}.wea")
     output_surface_dir = os.path.join(project.management_parent_dir, project.management_project_name, "outputs", project.management_host_name,
-                                      project.management_scenario_name, "irradiance", f"surface_{radiance_surface_key}")
+                                      project.management_scenario_name, "irradiance", f"{radiance_surface_key}")
     results_filepath = os.path.join(output_surface_dir, f"{component}.feather")
     ill_df = general.build_full_ill(results_filepath, wea_file=wea_filepath)
     ill_df.sort_index(inplace=True)
@@ -67,7 +67,7 @@ def read_ill(filepath):
 
 def load_grid_file(project, radiance_surface_key):
     input_surface_dir = os.path.join(project.management_parent_dir, project.management_project_name, "inputs", "hosts", project.management_host_name,
-                                     project.management_scenario_name, "radiance", f"surface_{radiance_surface_key}")
+                                     project.management_scenario_name, "radiance", f"{radiance_surface_key}")
 
     pts_path = glob.glob(os.path.join(input_surface_dir, "model", "grid", "*.pts"))[0]
     return load_sensor_points(pts_path)
