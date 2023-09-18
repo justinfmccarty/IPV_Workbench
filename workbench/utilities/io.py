@@ -47,6 +47,14 @@ def read_wea(wea_file, year=2030):
     df.set_index(pd.to_datetime(df[["year", "month", "day", "hour"]]), inplace=True)
     return df, header
 
+def find_ill_skip(fp):
+    break_line = None
+    with open(fp, "r") as fp_:
+        for n, line in enumerate(fp_.readlines()):
+            if "FORMAT=ascii" in line:
+                break_line = n
+                break
+    return break_line + 1
 
 def read_ill(filepath):
     """
@@ -57,7 +65,8 @@ def read_ill(filepath):
     # this works on honeybee files
     # return pd.read_csv(filepath, delimiter=' ', header=None, dtype='float32').iloc[:, 1:].T.reset_index(drop=True)
     if pathlib.Path(filepath).suffix == ".ill":
-        df = pd.read_csv(filepath, header=None, skiprows=11, delimiter=' ', dtype='float')
+        skiprows_n = find_ill_skip(filepath)
+        df = pd.read_csv(filepath, header=None, skiprows=skiprows_n, delimiter=' ', dtype='float')
         df = df[range(1, len(df.columns))].round(2)
     else:
         df = pd.read_feather(filepath)
