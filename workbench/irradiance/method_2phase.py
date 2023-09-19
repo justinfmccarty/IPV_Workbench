@@ -504,7 +504,7 @@ def ill_to_df(project):
     diffuse = indirect_illuminance * lux_to_wattm2
     diffuse = diffuse.astype("float").round(2)
     diffuse = pd.DataFrame(np.where(diffuse < 0, direct*0.01, diffuse))
-    return direct, diffuse
+    return pd.DataFrame(direct.values), pd.DataFrame(diffuse.values)
 
 
 def save_irradiance_results(project):
