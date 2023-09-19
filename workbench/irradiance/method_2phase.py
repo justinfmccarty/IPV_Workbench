@@ -99,7 +99,7 @@ def build_cmd_oconv(radiance_project_dir, radiance_surface_key, step):
 
         else:
             print(
-                "The file 'suns.rad' is missing. This can be generated from a primiary solar material and then 'rcalc' with a reinhart sky.")
+                "The file 'suns.rad' is missing. This can be generated from a primary solar material and then 'rcalc' with a reinhart sky.")
             return FileNotFoundError
 
     else:
@@ -132,9 +132,13 @@ def create_skyglow(skyglow_file, resolution, dst):
         fp.writelines(new_lines)
 
 
-def build_cmd_rfluxmtx(radiance_project_dir, radiance_surface_key, skyglow_template, step,
+def build_cmd_rfluxmtx(radiance_project_dir, radiance_surface_key, skyglow_template, step, use_accelerad=False,
                        n_workers=None, rad_params=None):
-    cmd = ["rfluxmtx", "-I+"]
+    if use_accelerad==True:
+        print("Using Accelerad.")
+        cmd = ["accelerad_rfluxmtx", "-I+"]
+    else:
+        cmd = ["rfluxmtx", "-I+"]
     radiance_surface_dir = os.path.join(radiance_project_dir, radiance_surface_key)
     output_dir = os.path.join(radiance_surface_dir, "outputs", "matrices")
     io.directory_creator(output_dir)
@@ -172,7 +176,16 @@ def build_cmd_rfluxmtx(radiance_project_dir, radiance_surface_key, skyglow_templ
     # rad_params
     if rad_params is None:
         rad_params = "-lw 0.0001 -ab 5 -ad 10000"
-    cmd += rad_params.split(" ")
+    
+    rp_list = rad_params.split(" ")
+    
+    if step=='direct':
+        for n,p in enumerate(rp_list):
+            if p=="-ab":
+                r = n+1
+        rp_list[r] = "1"
+                
+    cmd += rp_list
 
     # skyglow
     cmd += ["-", f"{skyglow_file}"]
@@ -184,9 +197,9 @@ def build_cmd_rfluxmtx(radiance_project_dir, radiance_surface_key, skyglow_templ
 
 
 def build_cmd_epw2wea(radiance_project_dir, radiance_surface_key, input_epw):
-    input_epw = pathlib.Path(input_epw)
+    # input_epw = pathlib.Path(input_epw)
     radiance_surface_dir = os.path.join(radiance_project_dir, radiance_surface_key)
-    wea_name = input_epw.name.replace(".epw", ".wea")
+    wea_name = input_epw.replace(".epw", ".wea")
 
     output_wea = os.path.join(radiance_surface_dir, 'model', wea_name)
 
@@ -393,9 +406,8 @@ def run_2phase_dds(project, year=2099):
 
         ## rfluxmtx
         print("     - rfluxmtx")
-
         cmd_rfluxmtx, output_file, input_file = build_cmd_rfluxmtx(radiance_project_dir, radiance_surface_key,
-                                                                   skyglow_template_file, step,
+                                                                   skyglow_template_file, step, use_accelerad=project.use_accelerad,
                                                                    n_workers=n_workers, rad_params=rflux_rad_params)
         # print(" ".join(cmd_rfluxmtx) + " > " + output_file)
         with open(input_file, "rb") as fp:
