@@ -1,12 +1,8 @@
-import os
 import numpy as np
-import glob
-import pandas as pd
 
-from workbench.device import module_devices, temperature
-from workbench.utilities import general, io
-from workbench.device import cell_devices
-from workbench.irradiance import method_effective_irradiance
+from workbench.device import temperature
+from workbench.utilities import general
+from workbench.simulations import method_effective_irradiance
 
 
 def module_efficiency_method(eff_stc, area_mod, G_eff, B_ref, T_cell, T_stc=25, I_misc=0.10):
@@ -101,13 +97,13 @@ def module_cell_pt(module_dict, pv_cells_xyz_arr, sensor_pts_xyz_arr, direct, di
     front_cover = module_dict['Layers']['front_film']
     # calculate the effective irradiance for the year
     G_eff_ann = method_effective_irradiance.calculate_effective_irradiance_timeseries(G_dir_ann,
-                                                                    G_diff_ann,
-                                                                    module_normal,
-                                                                    all_hoy,
-                                                                    tmy_location,
-                                                                    psl,
-                                                                    dbt,
-                                                                    front_cover)
+                                                                                      G_diff_ann,
+                                                                                      module_normal,
+                                                                                      all_hoy,
+                                                                                      tmy_location,
+                                                                                      psl,
+                                                                                      dbt,
+                                                                                      front_cover)
 
     Pmod_results = {}
     Gmod_results = {}

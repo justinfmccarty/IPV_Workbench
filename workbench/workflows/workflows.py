@@ -2,8 +2,8 @@ import time
 import os
 import shutil
 
-from workbench.host import results_writers
-from workbench.irradiance import method_2phase
+from workbench.manage import results_writers
+from workbench.simulations import method_2phase
 from workbench.utilities import general
 
 

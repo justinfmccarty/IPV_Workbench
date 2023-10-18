@@ -1,6 +1,6 @@
 from pvlib import pvsystem, singlediode
 import numpy as np
-import multiprocess as mp
+import multiprocessing as mp
 
 import workbench.utilities.temporal
 from workbench.old_solver import calculations

@@ -2,10 +2,7 @@ import time
 import os
 import numpy as np
 import pandas as pd
-from workbench.utilities import general
-from workbench.host import host
-from workbench.host import results_writers as ipv_results
-from workbench.device import cell_devices
+from workbench.manage import results_writers as ipv_results, host
 
 
 def format_raw_filename(cell_technology, orientation, front_cover, object_name):
@@ -23,11 +20,11 @@ def run_configuration(project_folder, surface, building, direction, cell_technol
     log_file = os.path.join(project_folder, 'shared', 'resources', 'log_file.txt')
 
     panelizer_object = host.Host(project_folder,
-                                      building,
-                                      raw_panelizer_file,
-                                      exclude_surfaces=["{8733;0;0}"],
-                                      project_data=r"/Users/jmccarty/Nextcloud/Projects/12_CISBAT23_trees/panelizer_models/shared_data",
-                                      contextual_scenario=context)
+                                 building,
+                                 raw_panelizer_file,
+                                 exclude_surfaces=["{8733;0;0}"],
+                                 project_data=r"/Users/jmccarty/Nextcloud/Projects/12_CISBAT23_trees/panelizer_models/shared_data",
+                                 contextual_scenario=context)
     custom_device_data = pd.read_csv(panelizer_object.module_cell_data,
                                      index_col='scenario').loc[f"{cell_technology}{orientation}"].to_dict()
 

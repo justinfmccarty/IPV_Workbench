@@ -1,15 +1,6 @@
-from pvlib import pvsystem, singlediode
 import numpy as np
 import multiprocessing as mp
-from tqdm import notebook
-from workbench.host import module_mapping as ipv_mm
-from workbench.old_solver import calculations
-from workbench.host import host
-from workbench.utilities import circuits, general, temporal
-import time
-import copy
-import pandas as pd
-
+from workbench.utilities import temporal
 
 
 def main(panelizer_object, string, module_dict, pv_cells_xyz_arr, tmy_location, dbt, psl, grid_pts, direct_ill, diffuse_ill, base_parameters,

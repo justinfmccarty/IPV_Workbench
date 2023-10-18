@@ -3,13 +3,14 @@ import os
 import numpy as np
 import pandas as pd
 import multiprocessing as mp
+
+import workbench.device.devices
 from workbench.utilities import general, circuits, temporal, io, multi
 from workbench.old_solver import calculations as ipv_calc, compile_mp, topology_solver
 from workbench.old_solver import simulations
-from workbench.device import cell_devices, module_devices
-from workbench.irradiance import method_effective_irradiance as ipv_irrad
-from workbench.host import module_mapping as ipv_mm
-from workbench.generation import method_simple_power
+from workbench.device import devices
+from workbench.simulations import method_effective_irradiance as ipv_irrad, method_simple_power
+from workbench.manage import module_mapping as ipv_mm
 
 
 class Host:
@@ -205,7 +206,7 @@ class Host:
 
         for module in self.get_modules(surface):
             module_dict = self.get_dict_instance([surface, module])
-            module_dict['Parameters'] = module_devices.build_parameter_dict(module_dict, custom_module_data, base_parameters)
+            module_dict['Parameters'] = workbench.device.devices.build_parameter_dict(module_dict, custom_module_data, base_parameters)
             module_area, irradiance_result, power_result = method_simple_power.module_center_pt(module_dict,
                                                                                                 sensor_pts_xyz_arr,
                                                                                                 direct_irrad,
@@ -249,8 +250,8 @@ class Host:
             module_dict = self.get_dict_instance([surface, module_name])
             pv_cells_xyz_arr = np.array(self.get_cells_xyz(surface, module_name))
 
-            module_dict['Parameters'] = module_devices.build_parameter_dict(module_dict, custom_module_data,
-                                                                    base_parameters)
+            module_dict['Parameters'] = workbench.device.devices.build_parameter_dict(module_dict, custom_module_data,
+                                                                                      base_parameters)
 
             module_area, irradiance_result, power_result = method_simple_power.module_cell_pt(module_dict,
                                                                                               pv_cells_xyz_arr,
@@ -316,7 +317,7 @@ class Host:
 
         modules = self.get_modules(surface)
 
-        for module in modules:
+        # for module in modules:
 
 
     def calculate_module_curve(self, irradiance_hoy, temperature_hoy, submodule_map, subdiode_map):
@@ -1019,7 +1020,7 @@ def build_module_features(module_dict, timeseries, tmy_location, dbt, psl, pv_ce
     if len(pv_cells_xyz_arr.shape) > 2:
         pv_cells_xyz_arr = pv_cells_xyz_arr[0]
 
-    device_parameters = module_devices.build_parameter_dict(module_dict, custom_module_data, base_parameters)
+    device_parameters = workbench.device.devices.build_parameter_dict(module_dict, custom_module_data, base_parameters)
 
     # get direct and diffuse irradiance
     # pv_cells_xyz_arr = np.array(panelizer_object.get_cells_xyz(surface, string, module))
@@ -1181,7 +1182,7 @@ def compile_system_single_core_v2(module_dict, timeseries, dbt, G_eff_ann,
 def build_module_features_v2(module_dict, timeseries, dbt, G_eff_ann,
                              base_parameters, custom_module_data, default_submodule_map, default_diode_map,
                              default_subcell_map, cell_type):
-    device_parameters = module_devices.build_parameter_dict(module_dict, custom_module_data, base_parameters)
+    device_parameters = workbench.device.devices.build_parameter_dict(module_dict, custom_module_data, base_parameters)
 
     # nrows will always be 1 in cdte portrait now due to the changes in grasshopper. this may cause problem
     ncols = device_parameters['n_cols']

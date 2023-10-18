@@ -1,5 +1,6 @@
 import pandas as pd
-import proplot as pplt
+# import proplot as pplt
+import matplotlib.pyplot as plt
 import numpy as np
 from workbench.utilities import general, circuits
 
@@ -43,7 +44,7 @@ def plot_curves(i_arrs, v_arrs, module_params, labels='label', colors='k', title
         share_ = True
     else:
         share_ = False
-    fig = pplt.figure(figsize=fs,
+    fig = plt.figure(figsize=fs,
                       num="single_curve",
                       share=share_,
                       clear=True,
@@ -161,7 +162,7 @@ def plot_curves(i_arrs, v_arrs, module_params, labels='label', colors='k', title
     if save != None:
         fig.savefig(save, dpi=300, bbox_inches='tight')
 
-    pplt.show()
+    plt.show()
     fig.clear()
-    pplt.close(fig)
+    plt.close(fig)
 

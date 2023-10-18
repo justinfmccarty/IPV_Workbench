@@ -1,6 +1,5 @@
 import numpy as np
-import sympy
-
+from workbench.utilities.general import is_prime
 
 def get_orientation(module_template_orientation):
     if module_template_orientation == "P":
@@ -273,9 +272,8 @@ def remap_subcell_cols(parameters, default_subcell_map):
                 [cols.append(n) for x in [0] * 2]
             new_diode_map = np.array(cols).reshape(-1, actual_cols)
 
-        elif sympy.isprime(actual_cols):
+        elif is_prime(actual_cols):
             # number is prime, diodes will be uneven
-            remainder = actual_cols % 2
             cols = []
             for n in np.arange(0, np.floor(actual_cols / 2)):
                 if n == np.floor(actual_cols / 2) - 1:
@@ -326,9 +324,8 @@ def remap_subcell_cols(parameters, default_subcell_map):
                 [rows.append(n) for x in [0] * 2]
             new_diode_map = np.array(rows).reshape(actual_rows, -1)
 
-        elif sympy.isprime(actual_rows):
+        elif is_prime(actual_rows):
             # number is prime, diodes will be uneven
-            remainder = actual_rows % 2
             rows = []
             for n in np.arange(0, np.floor(actual_rows / 2)):
                 if n == np.floor(actual_rows / 2) - 1:

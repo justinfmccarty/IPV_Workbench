@@ -8,20 +8,18 @@ import configparser
 from workbench.utilities import general, config_utils, temporal, io
 
 
-def initiate_project(parent_directory, project_name, project_epw, device_id):
+def initiate_project(parent_directory, project_name, project_epw):
     """
 
 
     :param parent_directory: the directory within which to create a folder to hold the project inputs and outputs
     :param project_name: the name of the project which will be used to create the folder in the parent_directory
     :param project_epw: a project-specific EPW file located somewhere within your file directory
-    :param module_orientation: the orientation of the modules in the array (landscape or portrait)
-    :param device_if: the name of the solar device as specified in the cell_module_datasheet.csv
     :return: file path to the newly created configuration file
     """
     project_directory = os.path.join(parent_directory, project_name)
     io.directory_creator(project_directory)
-    default_config = os.path.join(pathlib.Path(__file__).parent,'default.config')
+    default_config = os.path.join(pathlib.Path(__file__).parent, 'default.config')
     new_config = os.path.join(project_directory, f"{project_name}.config")
     if os.path.exists(new_config):
         pass
@@ -41,8 +39,6 @@ def initiate_project(parent_directory, project_name, project_epw, device_id):
 
     timezone = temporal.get_timezone(tmy_location['lat'], tmy_location['lon'])
     config_utils.edit_cfg_file(new_config, 'management', 'timezone', timezone)
-
-    config_utils.edit_cfg_file(new_config, 'analysis', 'device_id', device_id)
 
     return new_config
 

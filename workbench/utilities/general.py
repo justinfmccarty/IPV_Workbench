@@ -1,3 +1,4 @@
+import math
 import sys
 import numpy as np
 import pandas as pd
@@ -378,3 +379,12 @@ def run_command(command):
     process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     stdout, stderr = process.communicate()
     return stdout, stderr, process.returncode
+
+
+def is_prime(n):
+    if n <= 1:
+        return False
+    for i in range(2, int(math.sqrt(n)) + 1):
+        if n % i == 0:
+            return False
+    return True

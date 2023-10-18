@@ -3,9 +3,8 @@ import multiprocessing as mp
 from multiprocessing.managers import SharedMemoryManager
 
 import workbench.utilities.io
-from workbench.host import module_mapping as ipv_mm
-from workbench.utilities import general
-from workbench.irradiance import method_effective_irradiance as ipv_irrad
+from workbench.manage import module_mapping as ipv_mm
+from workbench.simulations import method_effective_irradiance as ipv_irrad
 import pandas as pd
 
 

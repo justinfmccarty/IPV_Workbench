@@ -1,13 +1,8 @@
-import copy
 import os
 import time
 import pandas as pd
-from workbench.device import cell_devices
-from workbench.host import host
-from workbench.utilities import general
-from workbench.host import results_writers as ipv_results
+from workbench.manage import results_writers as ipv_results
 import numpy as np
-from tqdm import tqdm
 
 
 def run_building(project_folder, cell_technology, orientation, front_cover, building, year, scenario, log_file,

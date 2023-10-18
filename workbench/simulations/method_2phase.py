@@ -197,16 +197,16 @@ def build_cmd_rfluxmtx(radiance_project_dir, radiance_surface_key, skyglow_templ
 
 
 def build_cmd_epw2wea(radiance_project_dir, radiance_surface_key, input_epw):
-    # input_epw = pathlib.Path(input_epw)
+    input_epw = pathlib.Path(input_epw)
     radiance_surface_dir = os.path.join(radiance_project_dir, radiance_surface_key)
-    wea_name = input_epw.replace(".epw", ".wea")
+    wea_name = input_epw.name.replace(".epw", ".wea")
 
     output_wea = os.path.join(radiance_surface_dir, 'model', wea_name)
 
     cmd = ['epw2wea']
 
-    cmd += [input_epw]
-    cmd += [output_wea]
+    cmd += [pathlib.Path(input_epw).__str__()]
+    cmd += [pathlib.Path(output_wea).__str__()]
     return cmd, output_wea
 
 
@@ -453,7 +453,7 @@ def run_2phase_dds(project, year=2099):
     cmd_rcalc = build_cmd_rcalc()
     # merge and point to file
     full_cmd = " ".join(cmd_cnt) + " | " + " ".join(cmd_rcalc) + f" >> {prim_sun_file}"
-    # run
+
     subprocess.run(full_cmd, shell=True)
 
     ## Run oconv
