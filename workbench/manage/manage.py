@@ -53,7 +53,7 @@ class Project:
                 value_in = self.config[section][k]
                 formatted_value = config_utils.format_config_item(section, k, value_in)
                 self.__setattr__(f"{section}_{k}", formatted_value)
-        if self.use_accelerad == True:
+        if self.irradiance_use_accelerad == True:
             self.irradiance_n_workers = 1
         else:
             if self.irradiance_n_workers == 0:
@@ -129,11 +129,11 @@ class Project:
 
         self.MODULE_CELL_DIR = os.path.join(self.SHARED_DIR, "cell_module_data")
         io.directory_creator(self.MODULE_CELL_DIR)
-        self.module_cell_data = os.path.join(self.MODULE_CELL_DIR, "cell_module_datasheets.csv")
+        self.module_cell_data = os.path.join(self.MODULE_CELL_DIR, "cactus_typical_devices.csv")
         if os.path.exists(self.module_cell_data):
             pass
         else:
-            default_module_data = os.path.join(library_root, "device", "default_devices", "cell_module_datasheets.csv")
+            default_module_data = os.path.join(library_root, "device", "default_devices", "cactus_typical_devices.csv")
             io.copy_file(default_module_data, self.module_cell_data)
         self.cec_data = os.path.join(self.MODULE_CELL_DIR, "cec_database_local.csv")
         if os.path.exists(self.cec_data):
@@ -166,7 +166,7 @@ class Project:
         io.directory_creator(self.SCEN_RESULTS)
         self.POWER_RESULTS_DIR = os.path.join(self.SCEN_RESULTS, "power")
         io.directory_creator(self.POWER_RESULTS_DIR)
-        self.LCA_RESULTS_DIR = os.path.join(self.SCEN_RESULTS, "old_lca")
+        self.LCA_RESULTS_DIR = os.path.join(self.SCEN_RESULTS, "lcia")
         io.directory_creator(self.LCA_RESULTS_DIR)
         self.LCCA_RESULTS_DIR = os.path.join(self.SCEN_RESULTS, "lcca")
         io.directory_creator(self.LCCA_RESULTS_DIR)
@@ -180,7 +180,7 @@ class Project:
         # self.CUMULATIVE_RESULTS_DENSE_DIR = os.path.join(self.HOSTS_DIR, "cumulative_condensed")
         # general.directory_creator(self.CUMULATIVE_RESULTS_DENSE_DIR)
 
-        self.COLD_DIR = os.path.join(self.HOST_DIR, "cold_storage")
+        self.COLD_DIR = os.path.join(self.HOST_DIR, "compressed")
 
         io.directory_creator(self.COLD_DIR)
         if self.management_scenario_name == None:
@@ -198,8 +198,8 @@ class Project:
         # template data
         ## geometry writers
         for file_ext in ["3dm", "gh"]:
-            src = os.path.join(library_root, "template_files", f"0_workbench_geometry_template.{file_ext}")
-            dst = os.path.join(self.GEOMETRY_DIR, f"0_workbench_geometry_template.{file_ext}")
+            src = os.path.join(library_root, "template_files", f"0_cactus_geometry_template.{file_ext}")
+            dst = os.path.join(self.GEOMETRY_DIR, f"0_cactus_geometry_template.{file_ext}")
             io.copy_file(src, dst)
 
         # ## radiance writer
@@ -208,14 +208,14 @@ class Project:
         # general.copy_file(src, dst)
 
         ## panelizer
-        src = os.path.join(library_root, "template_files", f"1_workbench_panelizer_template.gh")
-        dst = os.path.join(self.GEOMETRY_DIR, f"1_workbench_panelizer_template.gh")
+        src = os.path.join(library_root, "template_files", f"1_cactus_panelizer_template.gh")
+        dst = os.path.join(self.GEOMETRY_DIR, f"1_cactus_panelizer_template.gh")
         io.copy_file(src, dst)
 
         ## radiance files
         self.skyglow_template = os.path.join(library_root, "template_files", "skyglow.rad")
 
-        print("The project is initialized. We have created a base host object named 'B1000'.\n"
+        print(f"The project is initialized. We have created a base host object named '{self.management_host_name}'.\n"
               "You will need to either move or create the geometry and panelizer files into the appropriate directories.\n"
               "The geometry files should follow the convention defined in the output of the template grasshopper and rhino files.\n"
               "The panelizer files are those that have been created using the grasshopper utility. The Panelizer is\n"

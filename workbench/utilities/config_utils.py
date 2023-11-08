@@ -26,9 +26,10 @@ def format_config_item(section, key, value):
                                     'radiance_param_rflux': 'str',
                                     'radiance_param_rcontrib': 'str',
                                     'n_workers': 'int',
-                                    'store_radiance': 'bool'},
+                                    'store_radiance': 'bool',
+                                    'use_accelerad': 'bool'},
                      }
-
+    bool_map = {'true':True,'false':False}
     if value == 'None':
         value_out = None
     else:
@@ -48,7 +49,7 @@ def format_config_item(section, key, value):
         elif format_type == 'float':
             value_out = float(value)
         elif format_type == 'bool':
-            value_out = bool(value)
+            value_out = bool_map[value.lower()]
         elif format_type == 'list-str':
             value_out = [str(v) for v in value.split(",")]
         elif format_type == 'list-int':
@@ -56,7 +57,7 @@ def format_config_item(section, key, value):
         elif format_type == 'list-float':
             value_out = [float(v) for v in value.split(",")]
         elif format_type == 'list-bool':
-            value_out = [bool(v) for v in value.split(",")]
+            value_out = [bool_map[v.lower()] for v in value.split(",")]
         elif format_type == 'tuple-float':
             value_out = tuple([float(v) for v in value.split(",")])
         else:
@@ -68,6 +69,7 @@ def format_config_item(section, key, value):
 def edit_cfg_file(config_path, section, key, new_value):
     parser = configparser.ConfigParser()
     parser.read(config_path)
+    # value_out = format_config_item(section, key, new_value)
     parser.set(section, key, str(new_value))
 
     # Writing our configuration file to 'example.ini'
