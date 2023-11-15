@@ -200,13 +200,13 @@ class Host:
 
         surface_details = self.get_dict_instance([surface])['Details']
 
-        base_parameters = io.get_cec_data(surface_details['cec_key'], file_path=self.project.cec_data)
-        custom_module_data = pd.read_csv(self.project.module_cell_data, index_col='device_id').loc[
+        # base_parameters = io.get_cec_data(surface_details['cec_key'], file_path=self.project.cec_data)
+        custom_module_data = pd.read_csv(self.project.module_cell_data, index_col='general_device_id').loc[
             surface_details['device_id']].to_dict()
 
         for module in self.get_modules(surface):
             module_dict = self.get_dict_instance([surface, module])
-            module_dict['Parameters'] = workbench.device.devices.build_parameter_dict(module_dict, custom_module_data, base_parameters)
+            module_dict['Parameters'] = workbench.device.devices.build_parameter_dict(module_dict, custom_module_data)
             module_area, irradiance_result, power_result = method_simple_power.module_center_pt(module_dict,
                                                                                                 sensor_pts_xyz_arr,
                                                                                                 direct_irrad,
@@ -241,8 +241,8 @@ class Host:
         sensor_pts_xyz_arr = grid_pts[['X', 'Y', 'Z']].values
 
         surface_details = self.get_dict_instance([surface])['Details']
-        base_parameters = io.get_cec_data(surface_details['cec_key'], file_path=self.project.cec_data)
-        custom_module_data = pd.read_csv(self.project.module_cell_data, index_col='device_id').loc[
+        # base_parameters = io.get_cec_data(surface_details['cec_key'], file_path=self.project.cec_data)
+        custom_module_data = pd.read_csv(self.project.module_cell_data, index_col='general_device_id').loc[
             surface_details['device_id']].to_dict()
 
         modules = self.get_modules(surface)
@@ -250,8 +250,7 @@ class Host:
             module_dict = self.get_dict_instance([surface, module_name])
             pv_cells_xyz_arr = np.array(self.get_cells_xyz(surface, module_name))
 
-            module_dict['Parameters'] = workbench.device.devices.build_parameter_dict(module_dict, custom_module_data,
-                                                                                      base_parameters)
+            module_dict['Parameters'] = workbench.device.devices.build_parameter_dict(module_dict, custom_module_data)
 
             module_area, irradiance_result, power_result = method_simple_power.module_cell_pt(module_dict,
                                                                                               pv_cells_xyz_arr,
@@ -312,7 +311,7 @@ class Host:
 
         surface_details = self.get_dict_instance([surface])['Details']
         base_parameters = io.get_cec_data(surface_details['cec_key'], file_path=self.project.cec_data)
-        custom_module_data = pd.read_csv(self.project.module_cell_data, index_col='device_id').loc[
+        custom_module_data = pd.read_csv(self.project.module_cell_data, index_col='general_device_id').loc[
             surface_details['device_id']].to_dict()
 
         modules = self.get_modules(surface)

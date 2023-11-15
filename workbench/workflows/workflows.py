@@ -23,6 +23,7 @@ def run_irradiance(host):
         start_time = time.time()
         # change surface
         host.project.edit_cfg_file('analysis', 'active_surface', surface)
+
         # run 2 phase
         method_2phase.run_2phase_dds(host.project)
         total_time = round(time.time() - start_time, 2)
@@ -70,12 +71,13 @@ def run_module_point(host, point_resolution):
     for surface in surfaces:
         # clean curly brackets
         surface_c = general.clean_grasshopper_key(surface)
-        print(f"Starting module center point analysis workflow for surface {surface_c}.")
+        print(f"Starting module {point_resolution} analysis workflow for surface {surface_c}.")
         start_time = time.time()
         # change surface
         host.project.edit_cfg_file('analysis', 'active_surface', surface_c)
         # run method
         if point_resolution == 'center_point':
+            print(surface)
             host.solve_module_center_pts(surface)
         elif point_resolution == 'cell_point':
             host.solve_module_cell_pts(surface)

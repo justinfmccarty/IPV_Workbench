@@ -51,16 +51,16 @@ def pv_watts_method(G_eff, T_cell, P_ref, gamma, T_ref=25, G_ref=1000, I_misc=0.
 
 
 def module_center_pt(module_dict, sensor_pts_xyz_arr, direct, diffuse, all_hoy, tmy_location, psl, dbt):
-    module_center = np.stack([module_dict['Details']['center_pt']])
+    module_center = np.stack([module_dict['Details']['panelizer_center_pt']])
 
-    T_noct = module_dict['Parameters']['T_NOCT']
-    nom_eff = module_dict['Parameters']['nom_eff']
-    peak_power = module_dict['Parameters']['actual_capacity_Wp']
-    area_mod = module_dict['Parameters']['actual_module_area_m2']
-    area_cells = module_dict['Parameters']['actual_cell_area_m2']
-    module_normal = module_dict['Details']['normal']
-    gamma_ref = module_dict['Parameters']['gamma_ref']
-    front_cover = module_dict['Layers']['front_film']
+    T_noct = module_dict['Parameters']['performance_NOCT_T_degC']
+    # nom_eff = module_dict['Parameters']['param_nom_eff']
+    peak_power = module_dict['Parameters']['param_actual_capacity_Wp']
+    area_mod = module_dict['Parameters']['param_actual_module_area_m2']
+    area_cells = module_dict['Parameters']['param_actual_total_cell_area_m2']
+    module_normal = module_dict['Details']['panelizer_normal']
+    gamma_ref = module_dict['Parameters']['performance_temp_coe_gamma_pctC']
+    front_cover = module_dict['Layers']['panelizer_front_film']
 
     G_dir_ann = general.collect_raw_irradiance(module_center, sensor_pts_xyz_arr, direct)
     G_diff_ann = general.collect_raw_irradiance(module_center, sensor_pts_xyz_arr, diffuse)
@@ -83,18 +83,18 @@ def module_center_pt(module_dict, sensor_pts_xyz_arr, direct, diffuse, all_hoy, 
     return module_area, irradiance, power
 
 def module_cell_pt(module_dict, pv_cells_xyz_arr, sensor_pts_xyz_arr, direct, diffuse, all_hoy, tmy_location, psl, dbt):
-    T_noct = module_dict['Parameters']['T_NOCT']
-    nom_eff = module_dict['Parameters']['nom_eff']
-    peak_power = module_dict['Parameters']['cell_peak_Wp']
-    area_cell = module_dict['Parameters']['one_cell_area_m2']
-    module_area = module_dict['Parameters']['actual_module_area_m2']
-    module_normal = module_dict['Details']['normal']
-    gamma_ref = module_dict['Parameters']['gamma_ref']
+    T_noct = module_dict['Parameters']['performance_NOCT_T_degC']
+    # nom_eff = module_dict['Parameters']['nom_eff']
+    peak_power = module_dict['Parameters']['param_actual_capacity_Wp']
+    area_cell = module_dict['Parameters']['param_one_cell_area_m2']
+    module_area = module_dict['Parameters']['param_actual_module_area_m2']
+    module_normal = module_dict['Details']['panelizer_normal']
+    gamma_ref = module_dict['Parameters']['performance_temp_coe_gamma_pctC']
 
     G_dir_ann = general.collect_raw_irradiance(pv_cells_xyz_arr, sensor_pts_xyz_arr, direct)
     G_diff_ann = general.collect_raw_irradiance(pv_cells_xyz_arr, sensor_pts_xyz_arr, diffuse)
 
-    front_cover = module_dict['Layers']['front_film']
+    front_cover = module_dict['Layers']['panelizer_front_film']
     # calculate the effective irradiance for the year
     G_eff_ann = method_effective_irradiance.calculate_effective_irradiance_timeseries(G_dir_ann,
                                                                                       G_diff_ann,
@@ -132,7 +132,7 @@ def module_cell_pt(module_dict, pv_cells_xyz_arr, sensor_pts_xyz_arr, direct, di
         # Gmod is originally an array of W/m2 for each cell. Need to convert this array to W by multiply by cell area
         # then take the sum of irradiance for all the cells
         # this first statement takes the mean of the subcells if necesssary (just like in the simulation)
-        if module_dict['Parameters']['N_subcells'] > 1:
+        if module_dict['Parameters']['param_n_subcells'] > 1:
             if module_dict['Parameters']['orientation'] == 'portrait':
                 Gmod = np.mean(Gmod, axis=0)
             else:

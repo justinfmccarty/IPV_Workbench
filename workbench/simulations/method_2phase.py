@@ -207,6 +207,7 @@ def build_cmd_epw2wea(radiance_project_dir, radiance_surface_key, input_epw):
 
     cmd += [pathlib.Path(input_epw).__str__()]
     cmd += [pathlib.Path(output_wea).__str__()]
+
     return cmd, output_wea
 
 
@@ -407,7 +408,7 @@ def run_2phase_dds(project, year=2099):
         ## rfluxmtx
         print("     - rfluxmtx")
         cmd_rfluxmtx, output_file, input_file = build_cmd_rfluxmtx(radiance_project_dir, radiance_surface_key,
-                                                                   skyglow_template_file, step, use_accelerad=project.use_accelerad,
+                                                                   skyglow_template_file, step, use_accelerad=project.irradiance_use_accelerad,
                                                                    n_workers=n_workers, rad_params=rflux_rad_params)
         # print(" ".join(cmd_rfluxmtx) + " > " + output_file)
         with open(input_file, "rb") as fp:

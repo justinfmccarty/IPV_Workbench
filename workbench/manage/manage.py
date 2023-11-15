@@ -59,6 +59,12 @@ class Project:
             if self.irradiance_n_workers == 0:
                 self.irradiance_n_workers = os.cpu_count() - 1
 
+        for section in self.config.sections():
+            for k in list(self.config[section].keys()):
+                value_in = self.__getattribute__(f"{section}_{k}")
+                formatted_value = config_utils.format_config_item(section, k, value_in)
+                self.edit_cfg_file(section, k, formatted_value, skip_update=True)
+
     def project_setup(self):
         library_root = pathlib.Path(__file__).parent.parent
 
@@ -126,7 +132,6 @@ class Project:
 
 
         ### device data
-
         self.MODULE_CELL_DIR = os.path.join(self.SHARED_DIR, "cell_module_data")
         io.directory_creator(self.MODULE_CELL_DIR)
         self.module_cell_data = os.path.join(self.MODULE_CELL_DIR, "cactus_typical_devices.csv")
@@ -164,6 +169,8 @@ class Project:
         io.directory_creator(self.HOST_RESULTS)
         self.SCEN_RESULTS = os.path.join(self.HOST_RESULTS, self.management_scenario_name)
         io.directory_creator(self.SCEN_RESULTS)
+        self.GENERAL_RESULTS_DIR = os.path.join(self.SCEN_RESULTS, "general")
+        io.directory_creator(self.GENERAL_RESULTS_DIR)
         self.POWER_RESULTS_DIR = os.path.join(self.SCEN_RESULTS, "power")
         io.directory_creator(self.POWER_RESULTS_DIR)
         self.LCA_RESULTS_DIR = os.path.join(self.SCEN_RESULTS, "lcia")
@@ -222,7 +229,7 @@ class Project:
               "not ready for a pure python implementation as of yet.")
     def get_irradiance_results(self):
 
-        active_surface = f"surface_{self.analysis_active_surface}"
+        active_surface = f"{self.analysis_active_surface}"
         io.directory_creator(os.path.join(self.IRRADIANCE_RESULTS_DIR, active_surface))
         self.DIRECT_IRRAD_FILE = os.path.join(self.IRRADIANCE_RESULTS_DIR, active_surface, "direct.lz4")
         self.DIFFUSE_IRRAD_FILE = os.path.join(self.IRRADIANCE_RESULTS_DIR, active_surface, "diffuse.lz4")
@@ -235,7 +242,7 @@ class Project:
             n_negatives = 0
             rad_par = self.irradiance_radiance_param_rcontrib + " " + self.irradiance_radiance_param_rflux
             n_workers = self.irradiance_n_workers
-            rad_surface_dir = os.path.join(self.RADIANCE_DIR, f"surface_{self.analysis_active_surface}")
+            rad_surface_dir = os.path.join(self.RADIANCE_DIR, f"{self.analysis_active_surface}")
             grid_file = glob.glob(os.path.join(rad_surface_dir, "model", "grid", "*.pts"))[0]
             n_points = int(grid_file.split("_")[-1].split("s")[0])
         else:
@@ -258,11 +265,14 @@ class Project:
                 formatted_value = config_utils.format_config_item(section, k, value_in)
                 self.__setattr__(f"{section}_{k}", formatted_value)
 
-    def edit_cfg_file(self, section, key, new_value):
+    def edit_cfg_file(self, section, key, new_value, skip_update=False):
         self.config.set(section, key, str(new_value))
         with open(self.config_file_path, 'w') as configfile:
             self.config.write(configfile)
-        self.update_cfg()
+        if skip_update==True:
+            pass
+        else:
+            self.update_cfg()
 
     def create_sun_file(self):
         solpos = pvlib.solarposition.get_solarposition(
@@ -276,7 +286,7 @@ class Project:
             fp.writelines(solpos)
 
     def find_sun_file(self):
-        srf_dir = glob.glob(os.path.join(self.RADIANCE_DIR, "surface_*"))[0]
+        srf_dir = glob.glob(os.path.join(self.RADIANCE_DIR, "*"))[0]
         results_dir = glob.glob(os.path.join(srf_dir, "*results*"))[0]
         if "scenario" in results_dir.split(os.sep)[-1]:
             scen_dirs = glob.glob(os.path.join(results_dir, "*"))

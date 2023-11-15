@@ -19,7 +19,7 @@ def write_building_results_simple_timeseries(host, topology):
         ignore_demand = True
         print("File containing electricity loads not found. Results that require this input will not be calculated")
     # set result file
-    building_target_file = os.path.join(host.project.SCEN_RESULTS,
+    building_target_file = os.path.join(host.project.GENERAL_RESULTS_DIR,
                                         f"{scenario}_{topology}_building_level_results_hourly.csv")
     io.directory_creator(Path(building_target_file).parent)
 
@@ -231,7 +231,7 @@ def write_building_results_timeseries(po, scenario, topology):
     final_df["self_sufficiency_building_percent"] = self_suff
     final_df["self_consumption_building_percent"] = self_cons
     final_df.to_csv(building_target_file)
-
+    print(f"Saved results CSV to\n{building_target_file}.")
     return building_target_file
 
 

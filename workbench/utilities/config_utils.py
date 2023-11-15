@@ -30,7 +30,7 @@ def format_config_item(section, key, value):
                                     'use_accelerad': 'bool'},
                      }
     bool_map = {'true':True,'false':False}
-    if value == 'None':
+    if (value == 'None') or (value is None):
         value_out = None
     else:
         format_type = config_dtypes[section][key]
@@ -49,7 +49,7 @@ def format_config_item(section, key, value):
         elif format_type == 'float':
             value_out = float(value)
         elif format_type == 'bool':
-            value_out = bool_map[value.lower()]
+            value_out = bool_map[str(value).lower()]
         elif format_type == 'list-str':
             value_out = [str(v) for v in value.split(",")]
         elif format_type == 'list-int':
@@ -57,7 +57,7 @@ def format_config_item(section, key, value):
         elif format_type == 'list-float':
             value_out = [float(v) for v in value.split(",")]
         elif format_type == 'list-bool':
-            value_out = [bool_map[v.lower()] for v in value.split(",")]
+            value_out = [bool_map[str(v).lower()] for v in value.split(",")]
         elif format_type == 'tuple-float':
             value_out = tuple([float(v) for v in value.split(",")])
         else:

@@ -28,7 +28,7 @@ def load_irradiance_file(project, radiance_surface_key, component):
     wea_filepath = os.path.join(input_surface_dir, "model", f"{project.management_scenario_name}.wea")
     output_surface_dir = os.path.join(project.management_parent_dir, project.management_project_name, "outputs", project.management_host_name,
                                       project.management_scenario_name, "irradiance", f"{radiance_surface_key}")
-    results_filepath = os.path.join(output_surface_dir, f"{component}.feather")
+    results_filepath = os.path.join(output_surface_dir, f"{component}.lz4")
     ill_df = general.build_full_ill(results_filepath, wea_file=wea_filepath)
     ill_df.sort_index(inplace=True)
     return ill_df
