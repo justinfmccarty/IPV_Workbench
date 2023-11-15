@@ -118,6 +118,8 @@ def module_cell_pt(module_dict, pv_cells_xyz_arr, sensor_pts_xyz_arr, direct, di
 
         # Gmod_total = np.sum(Gmod.flatten()*module_dict['PARAMETERS']['one_cell_area_m2']) / module_dict['PARAMETERS']['actual_module_area_m2']
         # if Gmod_total < module_dict['PARAMETERS']['minimum_irradiance_module']
+
+        # For power
         if np.sum(Gmod < module_dict['Parameters']['minimum_irradiance_cell']) > 0:
 
             # print(hoy_n, hoy, time_utils.hoy_to_date(hoy), "Zero Array", np.sum(Gmod))
@@ -129,13 +131,15 @@ def module_cell_pt(module_dict, pv_cells_xyz_arr, sensor_pts_xyz_arr, direct, di
             #                                                         gamma_ref,
             #                                                         Tcells)
             Pcells = np.vectorize(pv_watts_method)(Gmod, Tcells, peak_power, gamma_ref)
+        Pmod_results[hoy] = np.sum(Pcells)
 
-            Pmod_results[hoy] = np.sum(Pcells)
-
+        # For area
         area_results[hoy] = module_area
+
+        # For irradiance
         # Gmod is originally an array of W/m2 for each cell. Need to convert this array to W by multiply by cell area
         # then take the sum of irradiance for all the cells
-        # this first statement takes the mean of the subcells if necesssary (just like in the simulation)
+        # this statement takes the mean of the subcells if necesssary (just like in the simulation)
         if module_dict['Parameters']['param_n_subcells'] > 1:
             if module_dict['Parameters']['orientation'] == 'portrait':
                 Gmod = np.mean(Gmod, axis=0)
