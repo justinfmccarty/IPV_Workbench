@@ -252,8 +252,8 @@ def tmy_location(tmy_file):
 
 def create_sun_mask(file_path_sun_up_hours):
     sun = pd.read_csv(file_path_sun_up_hours, names=['HOY'])
-    if len(sun[sun['HOY'] == range(1416, 1440)]) > 0:
-        print('Leap days detected')
+    # if len(sun[sun['HOY'] == range(1416, 1440)]) > 0:
+    #     print('Leap days detected')
 
     sun_hours = np.floor(sun).astype(int)
     empty = pd.DataFrame(data={'HOY': list(range(0, 8760))})
