@@ -67,10 +67,12 @@ def read_ill(filepath):
     if pathlib.Path(filepath).suffix == ".ill":
         skiprows_n = find_ill_skip(filepath)
         df = pd.read_csv(filepath, header=None, skiprows=skiprows_n, delimiter=' ', dtype='float')
-        df = df[range(1, len(df.columns))].round(2)
+        # df = df[range(1, len(df.columns))].round(2)
+        df = df.round(2)
     else:
         df = pd.read_feather(filepath)
-        df = df[range(1, len(df.columns))].round(2)
+        # df = df[range(1, len(df.columns))].round(2)
+        df = df.round(2)
     return df
 
 

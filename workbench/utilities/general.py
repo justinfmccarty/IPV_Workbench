@@ -32,9 +32,6 @@ def collect_raw_irradiance(pv_cells_xyz_arr, sensor_pts_xyz_arr, sensor_pts_irra
         first = cdist_arr.argsort()[:, 0]
         irrad_cell_mean = sensor_pts_irradiance_arr.T[first]
 
-
-
-
     return irrad_cell_mean.T
 
 

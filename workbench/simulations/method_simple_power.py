@@ -89,7 +89,7 @@ def module_center_pt(module_dict, sensor_pts_xyz_arr, direct, diffuse, all_hoy, 
 def module_cell_pt(module_dict, pv_cells_xyz_arr, sensor_pts_xyz_arr, direct, diffuse, all_hoy, tmy_location, psl, dbt):
     T_noct = module_dict['Parameters']['performance_NOCT_T_degC']
     # nom_eff = module_dict['Parameters']['nom_eff']
-    peak_power = module_dict['Parameters']['param_actual_capacity_Wp']
+    peak_power = module_dict['Parameters']['param_cell_peak_Wp']
     area_cell = module_dict['Parameters']['param_one_cell_area_m2']
     module_area = module_dict['Parameters']['param_actual_module_area_m2']
     module_normal = module_dict['Details']['panelizer_normal']

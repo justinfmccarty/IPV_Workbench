@@ -7,7 +7,7 @@ from workbench.simulations import method_2phase
 from workbench.utilities import general
 
 
-def run_irradiance(host):
+def run_irradiance(host, overwrite=True):
     # Before initializing a workflow always update the config file
     # in case a manual edit was made
     host.project.update_cfg()
@@ -19,11 +19,25 @@ def run_irradiance(host):
     for surface in surfaces:
         # clean curly brackets
         surface = general.clean_grasshopper_key(surface)
-        print(f"Starting Radiance workflow for surface {surface}.")
-        start_time = time.time()
         # change surface
         host.project.edit_cfg_file('analysis', 'active_surface', surface)
+        # set the irradiance results to an active variable in the project manager
+        host.project.get_irradiance_results()
 
+        # check to see if existing files exist and should be overwritten
+        if overwrite==True:
+            # no need to check for the files because they will be overwritten anyway
+            pass
+        else:
+            # if the results files exist then skip this surface in the loop
+            if (os.path.exists(host.project.DIFFUSE_IRRAD_FILE)) & (os.path.exists(host.project.DIRECT_IRRAD_FILE)):
+                print(f"Existing results files detected and the 'overwrite' arg is set to False, skipping surface {surface}.")
+                continue
+            else:
+                pass
+
+        print(f"Starting Radiance workflow for surface {surface}.")
+        start_time = time.time()
         # run 2 phase
         method_2phase.run_2phase_dds(host.project)
         total_time = round(time.time() - start_time, 2)
