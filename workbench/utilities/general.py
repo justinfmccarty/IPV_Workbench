@@ -225,9 +225,9 @@ def mask_nd(x, m):
     return np.array([arr for arr in np.split(x[m], np.cumsum(take)[:-1]) if len(arr) > 0])
 
 
-def create_voltage_range(sde_args, kwargs, curve_pts=1000):
+def create_voltage_range(sde_args, kwargs, iv_curve_pnts=1000):
     v_oc = pvlib.singlediode.bishop88_v_from_i(0.0, *sde_args, **kwargs)
-    evaluated_voltages = np.linspace(0.95 * kwargs['breakdown_voltage'], v_oc * 1.05, curve_pts)
+    evaluated_voltages = np.linspace(0.95 * kwargs['breakdown_voltage'], v_oc * 1.05, iv_curve_pnts)
     return evaluated_voltages
 
 
@@ -385,3 +385,11 @@ def is_prime(n):
         if n % i == 0:
             return False
     return True
+
+def create_linspace(min_, max_, unit_resolution):
+    return np.linspace(min_, max_, int((max_-min_)/unit_resolution)+1)
+
+def find_nearest(array, value):
+    array = np.asarray(array)
+    idx = (np.abs(array - value)).argmin()
+    return '%.2f' % array[idx]

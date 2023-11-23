@@ -28,38 +28,11 @@ import numpy as np
 # ================================ Curve Calculations ================================
 
 
-def calculate_module_map_dependent(Gmod, Tmod, module_dict, ivcurve_pnts=250):
-    if module_dict['PARAMETERS']['N_subcells'] > 1:
-        if module_dict['PARAMETERS']['orientation'] == 'portrait':
-            Imod, Vmod = calculate_module_curve_single_row(Gmod,
-                                                           Tmod,
-                                                           module_dict['PARAMETERS'],
-                                                           module_dict['MAPS']['SUBMODULES'],
-                                                           module_dict['MAPS']['DIODES'],
-                                                           module_dict['MAPS']['SUBCELLS'],
-                                                           ivcurve_pnts=ivcurve_pnts)
-        else:
-            Imod, Vmod = calculate_module_curve_single_column(Gmod,
-                                                              Tmod,
-                                                              module_dict['PARAMETERS'],
-                                                              module_dict['MAPS']['SUBMODULES'],
-                                                              module_dict['MAPS']['DIODES'],
-                                                              module_dict['MAPS']['SUBCELLS'],
-                                                              ivcurve_pnts=ivcurve_pnts)
 
-    else:
-        Imod, Vmod = calculate_module_curve_multiple_column(Gmod,
-                                                            Tmod,
-                                                            module_dict['PARAMETERS'],
-                                                            module_dict['MAPS']['SUBMODULES'],
-                                                            module_dict['MAPS']['DIODES'],
-                                                            ivcurve_pnts=ivcurve_pnts)
-
-    return Imod, Vmod
 
 def calculate_module_curve(irradiance_hoy, temperature_hoy, module_dict, cell_params, ivcurve_pnts=250):
-    # TODO break apart into constituent pieces
 
+    # TODO break apart into constituent pieces
     active_submodule_map = module_dict['MAPS']['SUBMODULES']
     active_diode_map = module_dict['MAPS']['DIODES']
     submodules = np.unique(active_submodule_map)
@@ -304,68 +277,68 @@ def calculate_module_curve_single_column(irradiance_hoy, temperature_hoy, parame
     return Imod, Vmod
 
 
-def calculate_module_curve_multiple_column(irradiance_hoy, temperature_hoy, parameters,
-                                           submodule_map, subdiode_map, ivcurve_pnts=250):
-    # TODO break apart into constituent pieces
-
-    submodules = np.unique(submodule_map)
-    diodes = np.unique(subdiode_map)
-
-    # we are going to solve the IV curves for current given voltages.
-    # Since we are solving at the level of the cell we need to parse down from the module range
-
-    # Basic assumption here: Module IV-curve can be converted to a cell IV-curve by
-    # dividing the module voltage by the number of cells the subcell current is calculated by
-    # dividing currents by the number of subcells.
-
-    submodule_i = []
-    submodule_v = []
-    for submodule_key in submodules:
-        submodule_mask = submodule_map == submodule_key
-
-        submodule_diode = utils.mask_nd(np.array(subdiode_map), submodule_mask)
-
-        submodule_irrad = utils.mask_nd(irradiance_hoy, submodule_mask)
-        submodule_temp = utils.mask_nd(temperature_hoy, submodule_mask)
-
-        diode_i = []
-        diode_v = []
-        for diode_key in diodes:
-            diode_mask = submodule_diode == diode_key
-
-            submodule_subdiode_irrad = utils.mask_nd(submodule_irrad, diode_mask)
-            submodule_subdiode_temp = utils.mask_nd(submodule_temp, diode_mask)
-
-            Icell, Vcell = simulations.solve_cells(parameters,
-                                                   submodule_subdiode_irrad.flatten(),
-                                                   submodule_subdiode_temp.flatten(),
-                                                   ivcurve_pnts=ivcurve_pnts)
-
-            sub_diode_curves = np.array([Icell.T, Vcell.T])
-            i, v = circuits.calc_series(sub_diode_curves,
-                                        breakdown_voltage=parameters['breakdown_voltage'],
-                                        diode_threshold=parameters['diode_threshold'],
-                                        bypass=False)
-            diode_i.append(i)
-            diode_v.append(v)
-
-        # calc series with bypass diodes to get submodule strings
-        diode_curves = np.array([diode_i, diode_v])
-        i, v = circuits.calc_series(diode_curves,
-                                    breakdown_voltage=parameters['breakdown_voltage'],
-                                    diode_threshold=parameters['diode_threshold'],
-                                    bypass=True)
-        submodule_i.append(i)
-        submodule_v.append(v)
-
-    # calc parallel connection of submodule strings to get module curves
-    submodule_curves = np.array([submodule_i, submodule_v])
-
-    # the parallel interpolation will work on lists of length 1 but can lead to weird results
-    # safer to just skip it if possible
-    if len(submodules) > 1:
-        Imod, Vmod = circuits.calc_parallel(submodule_curves)
-    else:
-        Imod = submodule_i[0]
-        Vmod = submodule_v[0]
-    return Imod, Vmod
+# def calculate_module_curve_multiple_column(irradiance_hoy, temperature_hoy, parameters,
+#                                            submodule_map, subdiode_map, ivcurve_pnts=250):
+#     # TODO break apart into constituent pieces
+#
+#     submodules = np.unique(submodule_map)
+#     diodes = np.unique(subdiode_map)
+#
+#     # we are going to solve the IV curves for current given voltages.
+#     # Since we are solving at the level of the cell we need to parse down from the module range
+#
+#     # Basic assumption here: Module IV-curve can be converted to a cell IV-curve by
+#     # dividing the module voltage by the number of cells the subcell current is calculated by
+#     # dividing currents by the number of subcells.
+#
+#     submodule_i = []
+#     submodule_v = []
+#     for submodule_key in submodules:
+#         submodule_mask = submodule_map == submodule_key
+#
+#         submodule_diode = general.mask_nd(np.array(subdiode_map), submodule_mask)
+#
+#         submodule_irrad = general.mask_nd(irradiance_hoy, submodule_mask)
+#         submodule_temp = general.mask_nd(temperature_hoy, submodule_mask)
+#
+#         diode_i = []
+#         diode_v = []
+#         for diode_key in diodes:
+#             diode_mask = submodule_diode == diode_key
+#
+#             submodule_subdiode_irrad = general.mask_nd(submodule_irrad, diode_mask)
+#             submodule_subdiode_temp = general.mask_nd(submodule_temp, diode_mask)
+#
+#             Icell, Vcell = simulations.solve_cells(parameters,
+#                                                    submodule_subdiode_irrad.flatten(),
+#                                                    submodule_subdiode_temp.flatten(),
+#                                                    ivcurve_pnts=ivcurve_pnts)
+#
+#             sub_diode_curves = np.array([Icell.T, Vcell.T])
+#             i, v = circuits.calc_series(sub_diode_curves,
+#                                         breakdown_voltage=parameters['breakdown_voltage'],
+#                                         diode_threshold=parameters['diode_threshold'],
+#                                         bypass=False)
+#             diode_i.append(i)
+#             diode_v.append(v)
+#
+#         # calc series with bypass diodes to get submodule strings
+#         diode_curves = np.array([diode_i, diode_v])
+#         i, v = circuits.calc_series(diode_curves,
+#                                     breakdown_voltage=parameters['breakdown_voltage'],
+#                                     diode_threshold=parameters['diode_threshold'],
+#                                     bypass=True)
+#         submodule_i.append(i)
+#         submodule_v.append(v)
+#
+#     # calc parallel connection of submodule strings to get module curves
+#     submodule_curves = np.array([submodule_i, submodule_v])
+#
+#     # the parallel interpolation will work on lists of length 1 but can lead to weird results
+#     # safer to just skip it if possible
+#     if len(submodules) > 1:
+#         Imod, Vmod = circuits.calc_parallel(submodule_curves)
+#     else:
+#         Imod = submodule_i[0]
+#         Vmod = submodule_v[0]
+#     return Imod, Vmod

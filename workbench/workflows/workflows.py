@@ -2,6 +2,8 @@ import time
 import os
 import shutil
 
+import numpy as np
+
 from workbench.manage import results_writers
 from workbench.simulations import method_2phase
 from workbench.utilities import general
@@ -64,7 +66,7 @@ def run_irradiance(host, overwrite=True):
         print("-----------------------")
 
 
-def run_module_point(host, point_resolution):
+def run_module_point(host_object, point_resolution):
     if point_resolution == 'center_point':
         pass
     elif point_resolution == 'cell_point':
@@ -76,10 +78,10 @@ def run_module_point(host, point_resolution):
 
     # Before initializing a workflow always update the config file
     # in case a manual edit was made
-    host.project.update_cfg()
+    host_object.project.update_cfg()
 
     # get surfaces for loop
-    surfaces = host.get_surfaces()
+    surfaces = host_object.get_surfaces()
 
     # start loop
     for surface in surfaces:
@@ -88,19 +90,42 @@ def run_module_point(host, point_resolution):
         print(f"Starting module {point_resolution} analysis workflow for surface {surface_c}.")
         start_time = time.time()
         # change surface
-        host.project.edit_cfg_file('analysis', 'active_surface', surface_c)
+        host_object.project.edit_cfg_file('analysis', 'active_surface', surface_c)
         # run method
         if point_resolution == 'center_point':
             print(surface)
-            host.solve_module_center_pts(surface)
+            host_object.solve_module_center_pts(surface)
         elif point_resolution == 'cell_point':
-            host.solve_module_cell_pts(surface)
+            host_object.solve_module_cell_pts(surface)
         total_time = round(time.time() - start_time, 2)
         print(f"Completed in {total_time} seconds.")
         print("-----------------------")
 
     print(f"Cumulating and saving results for host object.")
     start_time = time.time()
-    results_writers.write_building_results_simple_timeseries(host, point_resolution)
+    results_writers.write_building_results_simple_timeseries(host_object, point_resolution)
     total_time = round(time.time() - start_time, 2)
     print(f"Completed in {total_time} seconds.")
+
+
+def run_module_iv_solver(host_object):
+    # Before initializing a workflow always update the config file
+    # in case a manual edit was made
+    host_object.project.update_cfg()
+
+    # get surfaces for loop
+    surfaces = host_object.get_surfaces()
+
+    # start loop
+    for surface in surfaces:
+        # clean curly brackets
+        surface_c = general.clean_grasshopper_key(surface)
+
+        pv_cells_xyz_arr = np.array(host_object.get_cells_xyz(surface, module_name))
+
+        G_dir_ann = ipv_irrad.collect_raw_irradiance(pv_cells_xyz_arr,
+                                                     sensor_pts_xyz_arr,
+                                                     direct_ill)  # .values)
+        G_diff_ann = ipv_irrad.collect_raw_irradiance(pv_cells_xyz_arr,
+                                                      sensor_pts_xyz_arr,
+                                                      diffuse_ill)  # .values)

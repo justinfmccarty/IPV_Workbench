@@ -40,15 +40,16 @@ def plot_curves(i_arrs, v_arrs, module_params, labels='label', colors='k', title
     if not isinstance(linewidth, list):
         linewidth = [linewidth] * len(i_arrs)
 
-    if reverse == True:
-        share_ = True
-    else:
-        share_ = False
     fig = plt.figure(figsize=fs,
-                      num="single_curve",
-                      share=share_,
-                      clear=True,
-                      facecolor="white")
+                     num="single_curve",
+                     clear=True,
+                     facecolor="white")
+
+    # if reverse == True:
+    #     share_ = True
+    # else:
+    #     share_ = False
+
     ax1 = fig.add_subplot(1, 2, 1,
                           facecolor="white")
     ax2 = fig.add_subplot(1, 2, 2,

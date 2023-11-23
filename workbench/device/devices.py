@@ -1,7 +1,9 @@
 import os
 import numpy as np
+import pandas as pd
 
 from workbench.old_solver import simulations as sim
+from workbench.simulations import method_iv_solver
 from workbench.visualize import plots as ipv_plots
 from workbench.utilities import general, io
 
@@ -343,7 +345,8 @@ def build_parameter_dict(module_dict, custom_module_data):
     cell_coverage_typical = (m2_cell * ideal_cell_count) / base_parameters['module_shape_area_m2']
     base_parameters['param_actual_total_cell_area_m2'] = base_parameters['param_one_cell_area_m2'] * base_parameters[
         'param_total_cells']
-    base_parameters['param_actual_module_area_m2'] = base_parameters['param_actual_total_cell_area_m2'] * cell_coverage_typical
+    base_parameters['param_actual_module_area_m2'] = base_parameters[
+                                                         'param_actual_total_cell_area_m2'] * cell_coverage_typical
     base_parameters['param_Wp_m2_module'] = base_parameters['param_actual_capacity_Wp'] / base_parameters[
         'param_actual_module_area_m2']
     base_parameters['param_one_subcell_area_m2'] = base_parameters['param_one_cell_area_m2'] / base_parameters[
@@ -372,3 +375,43 @@ def build_parameter_dict(module_dict, custom_module_data):
     # module_dict['PARAMETERS'] = base_parameters.to_dict()
     # base_parameters = base_parameters.to_dict()
     return base_parameters
+
+
+def create_module_idx_arr(module_dict):
+    n_rows = module_dict['Parameters']['param_n_rows']
+    n_cols = module_dict['Parameters']['param_n_cols']
+
+    cell_idx_arr = np.arange(0, module_dict['Parameters']['param_total_cells']).reshape(n_rows, n_cols)
+
+    return np.flipud(cell_idx_arr)
+
+def build_device_iv_library(device_parameters, irradiance_range, temperature_range):
+
+    boundary_condition_keys = []
+    for irradiance_value in irradiance_range:
+        for temperature_value in temperature_range:
+            boundary_condition_keys.append((irradiance_value, temperature_value))
+
+    iv_dict = {}
+    for boundary_condition in boundary_condition_keys:
+        Geff = boundary_condition[0]
+        Tcell = boundary_condition[1]
+        i, v = method_iv_solver.solve_iv_curve(device_parameters, Geff, Tcell)
+        i = i / device_parameters['bishop_N_p_typical']
+        i = i / (device_parameters['general_cell_area_mm2_typical'] * 1e-6)
+        v = v / device_parameters['bishop_N_s_typical']
+        iv_dict[str(('%.2f' % Geff, '%.2f' % Tcell))] = i, v
+
+    return iv_dict
+
+def find_device_map(device_paramaters, project_manager, map_type='submodule'):
+    if map_type not in ['submodule','subdiode','subcell']:
+        print("The arg 'map_type' must be specified as 'submodule','subdiode', or 'subcell'. "
+              "Reverting to default 'submodule")
+        map_type = 'submodule'
+    device_name = device_paramaters['general_device_summary']
+    device_orientation = device_paramaters['shape_orientation']
+    file_name = f"{device_name}_{device_orientation}_maps"
+    file_path = [fp for fp in project_manager.MAP_FILES if file_name in fp][0]
+    df = pd.read_excel(file_path, header=None, sheet_name=map_type).to_numpy()  # .tolist()
+    return df
