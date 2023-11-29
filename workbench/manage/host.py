@@ -357,6 +357,7 @@ class Host:
 
         modules = self.get_modules(surface)
         for module_name in modules:
+            print(f"Solving module {module_name}.")
             module_dict = self.get_dict_instance([surface, module_name])
             pv_cells_xyz_arr = np.array(self.get_cells_xyz(surface, module_name))
             G_dir_ann_mod = general.collect_raw_irradiance(pv_cells_xyz_arr, sensor_pts_xyz_arr, direct_irrad)
@@ -382,7 +383,8 @@ class Host:
             Gmod = np.sum(G_eff_ann_mod * module_dict['Parameters']['param_one_cell_area_m2'], axis=1)
             module_dict['Yield']['initial_simulation']['irrad'] = dict(zip(self.all_hoy, np.round(Gmod, 3)))
 
-        # return Imod, Vmod
+        total_time = round(time.time() - start_time, 2)
+        self.project.log(total_time, "module-iv-curves")
 
     def string_surface(self, surface):
         stringer.building_string_map(self, surface)

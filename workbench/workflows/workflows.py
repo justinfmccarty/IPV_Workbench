@@ -170,6 +170,10 @@ def comprehensive_surface_analysis(host_object):
     # in case a manual edit was made
     host_object.project.update_cfg()
 
+    # solve initial IV curves
+    for surface in host_object.get_surfaces():
+        host_object.solve_all_modules_iv_curve(surface)
+
     for topology in ['micro_inverter', 'string_inverter', 'central_inverter']:
         run_topology_solver(host_object, topology)
         results_writers.write_building_results_timeseries(host_object, topology)
