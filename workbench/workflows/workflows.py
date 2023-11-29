@@ -5,7 +5,7 @@ import shutil
 import numpy as np
 
 from workbench.manage import results_writers
-from workbench.simulations import method_2phase
+from workbench.simulations import method_2phase, method_topology_solver
 from workbench.utilities import general
 
 
@@ -118,14 +118,61 @@ def run_module_iv_solver(host_object):
 
     # start loop
     for surface in surfaces:
-        # clean curly brackets
-        surface_c = general.clean_grasshopper_key(surface)
+        host_object.solve_all_modules_iv_curve(surface)
 
-        pv_cells_xyz_arr = np.array(host_object.get_cells_xyz(surface, module_name))
 
-        G_dir_ann = ipv_irrad.collect_raw_irradiance(pv_cells_xyz_arr,
-                                                     sensor_pts_xyz_arr,
-                                                     direct_ill)  # .values)
-        G_diff_ann = ipv_irrad.collect_raw_irradiance(pv_cells_xyz_arr,
-                                                      sensor_pts_xyz_arr,
-                                                      diffuse_ill)  # .values)
+
+def run_topology_solver(host_object, topology):
+    # Before initializing a workflow always update the config file
+    # in case a manual edit was made
+    host_object.project.update_cfg()
+
+    # get surfaces for loop
+    surfaces = host_object.get_surfaces()
+
+    if type(topology) == str:
+        topology_dict = dict(zip(surfaces, [topology] * len(surfaces)))
+    else:
+        topology_dict = topology
+
+    # start loop
+    for surface in surfaces:
+        surface_dict = host_object.get_dict_instance([surface])
+        topology = topology_dict[surface]
+        modules = host_object.get_modules(surface)
+        if topology=='micro_inverter':
+            for module in modules:
+                module_dict = host_object.get_dict_instance([surface, module])
+                module_dict['Yield'][topology] = method_topology_solver.solve_micro_inverter_mpp(host_object, module_dict)
+
+        elif topology=='string_inverter':
+            # check if there are strings
+            if len(surface_dict['Strings'].keys())==0:
+                # if not then run the rule-based stringer
+                host_object.string_surface(surface)
+            for string_key in host_object.get_string_keys(surface):
+                res = method_topology_solver.solve_string_inverter_mpp(host_object, surface, string_key)
+
+        elif topology=='central_inverter':
+            res = method_topology_solver.solve_central_inverter_mpp(host_object, surface)
+        else:
+            print("Arg 'topology' must be specified as one of 'micro_inverter', 'string_inverter', or 'central_inverter'."
+                  "Defaulting to 'micro_inverter'.")
+            topology = 'micro_inverter'
+            for module in modules:
+                module_dict = host_object.get_dict_instance([surface, module])
+                res = method_topology_solver.solve_micro_inverter_mpp(host_object, module_dict)
+                module_dict['Yield'][topology] = res
+
+
+def comprehensive_surface_analysis(host_object):
+    # Before initializing a workflow always update the config file
+    # in case a manual edit was made
+    host_object.project.update_cfg()
+
+    for topology in ['micro_inverter', 'string_inverter', 'central_inverter']:
+        run_topology_solver(host_object, topology)
+        results_writers.write_building_results_timeseries(host_object, topology)
+
+    for point_resolution in ['cell_point', 'center_point']:
+        run_module_point(host_object, point_resolution)

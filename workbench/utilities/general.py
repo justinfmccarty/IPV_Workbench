@@ -39,20 +39,20 @@ def flatten_list(lst):
     return [j for i in lst for j in i]
 
 
-def flip_maps(arr):
-    """
-    The panelizer from grasshopper writes the cells in a different order
-    than the maps are created. This corrects them so if they are flattened
-     they ar indexed the same. It only does this if the input for the object
-      was a file path and the map is a list (not a numpy array). This is
-      controlled in the panelizer object function itselfZ.
-    :param arr: the map (diode or submodule)
-    :return:
-    """
-    if type(arr) is list:
-        return np.fliplr(np.array(arr).T)
-    else:
-        return arr
+# def flip_maps(arr):
+#     """
+#     The panelizer from grasshopper writes the cells in a different order
+#     than the maps are created. This corrects them so if they are flattened
+#      they ar indexed the same. It only does this if the input for the object
+#       was a file path and the map is a list (not a numpy array). This is
+#       controlled in the panelizer object function itselfZ.
+#     :param arr: the map (diode or submodule)
+#     :return:
+#     """
+#     if type(arr) is list:
+#         return np.fliplr(np.array(arr).T)
+#     else:
+#         return arr
 
 
 # TODO build param file generator
@@ -306,6 +306,9 @@ def unpack_mp_results(mp_results, panelizer_object, surface, string, modules, ti
 
 def clean_grasshopper_key(key):
     return key.replace("{", "").replace("}", "").replace(";", "_")
+
+def reverse_grasshopper_key(key):
+    return "{" + key.replace("_",";") + "}"
 
 
 

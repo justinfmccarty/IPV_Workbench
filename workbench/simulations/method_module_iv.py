@@ -9,8 +9,6 @@ from workbench.device import temperature
 
 def solve_module_iv_curve(host_object, G_eff_ann_mod, module_dict, temporal_idx,
                           dbt):
-
-
     Imod = []
     Vmod = []
 
@@ -106,8 +104,9 @@ def module_curve_multiple_column(irradiance_hoy, temperature_hoy, module_idx_arr
 
             Icell = np.array(Icell_list)
             Vcell = np.array(Vcell_list)
-
             sub_diode_curves = np.array([Icell, Vcell])
+
+
             i, v = circuits.calc_series(sub_diode_curves,
                                         breakdown_voltage=module_parameters['bishop_breakdown_voltage'],
                                         # diode_threshold=module_parameters['diode_threshold'],

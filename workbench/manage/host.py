@@ -6,12 +6,11 @@ import multiprocessing as mp
 
 import workbench.device.devices
 from workbench.utilities import general, circuits, temporal, io, multi
-from workbench.old_solver import calculations as ipv_calc, compile_mp, topology_solver
+from workbench.old_solver import calculations as ipv_calc, compile_mp
 from workbench.old_solver import simulations
-from workbench.device import devices
+from workbench.device import devices, stringer
 from workbench.simulations import method_effective_irradiance as ipv_irrad, method_simple_power, method_module_iv, \
-    method_effective_irradiance
-from workbench.simulations import method_iv_solver as ipv_iv
+    method_effective_irradiance, method_topology_solver
 from workbench.manage import module_mapping as ipv_mm
 
 
@@ -42,8 +41,6 @@ class Host:
         self.temperature_range = general.create_linspace(-40, 40, project.analysis_map_temperature_resolution)
         self.set_panelizer_dict()
 
-
-
     def set_panelizer_dict(self):
         # print("Setting dict from raw panelizer file")
         if type(self.raw_panelizer) is dict:
@@ -68,28 +65,29 @@ class Host:
         surface = self.object_surfaces[0]
         module = self.get_modules(surface)[0]
         module_dict = self.get_dict_instance([surface, module])
-        self.device_iv_dict = devices.build_device_iv_library(module_dict['Parameters'], self.irradiance_range, self.temperature_range)
-
+        self.device_iv_dict = devices.build_device_iv_library(module_dict['Parameters'], self.irradiance_range,
+                                                              self.temperature_range)
 
     def add_module_level_data(self, surface, module):
         surface_details = self.get_dict_instance([surface])['Details']
         custom_module_data = pd.read_csv(self.project.module_cell_data, index_col='general_device_id').loc[
-        surface_details['device_id']].to_dict()
+            surface_details['device_id']].to_dict()
 
         module_dict = self.get_dict_instance([surface, module])
         module_dict['Parameters'] = workbench.device.devices.build_parameter_dict(module_dict,
                                                                                   custom_module_data)
         module_dict['map_idx_arr'] = devices.create_module_idx_arr(module_dict)
-        module_dict['Maps']['Submodules'] = devices.find_device_map(module_dict['Parameters'], self.project, map_type='submodule')
-        module_dict['Maps']['Subcells'] = devices.find_device_map(module_dict['Parameters'], self.project, map_type='subcell')
-        module_dict['Maps']['Diodes'] = devices.find_device_map(module_dict['Parameters'], self.project, map_type='subdiode')
-
+        module_dict['Maps']['Submodules'] = devices.find_device_map(module_dict['Parameters'], self.project,
+                                                                    map_type='submodule')
+        module_dict['Maps']['Subcells'] = devices.find_device_map(module_dict['Parameters'], self.project,
+                                                                  map_type='subcell')
+        module_dict['Maps']['Diodes'] = devices.find_device_map(module_dict['Parameters'], self.project,
+                                                                map_type='subdiode')
 
     def add_all_module_data(self):
         for surface in self.object_surfaces:
             for n, module in enumerate(self.get_modules(surface)):
                 self.add_module_level_data(surface, module)
-
 
     # def set_tmy_data(self):
     #     self.TMY_DIR = os.path.join(self.locator.RESOURCES_DIR, 'tmy')
@@ -116,7 +114,7 @@ class Host:
             hourly_resolution = 1
         else:
             hourly_resolution = self.hourly_resolution
-        self.all_hoy = temporal.build_analysis_period(self.sunup_array, hourly_resolution)
+        self.all_hoy = temporal.build_analysis_period(self.project.sunup_array, hourly_resolution)
 
         return self.all_hoy
 
@@ -135,14 +133,32 @@ class Host:
                                     srf not in self.project.management_exclude_surfaces]
         return self.active_surfaces
 
-    def get_strings(self, surface_name):
-        self.active_strings = list(self.panelizer_dict[self.object_type]['Surfaces'][surface_name]['Strings'].keys())
-        return self.active_strings
+    # def get_strings(self, surface_name):
+    #     self.active_strings = list(self.panelizer_dict[self.object_type]['Surfaces'][surface_name]['Strings'].keys())
+    #     return self.active_strings
+
+
+    def get_string_keys(self, surface):
+        return list(self.get_dict_instance([surface])['Strings'].keys())
+
+
+    def get_modules_on_string(self, surface, string_key):
+        return self.get_dict_instance([surface])['Strings'][string_key]['modules']
+
 
     def get_modules(self, surface_name):
         self.active_modules = list(
             self.panelizer_dict[self.object_type]['Surfaces'][surface_name]['Modules'].keys())
         return self.active_modules
+
+    def get_surface_capacities(self, surface_name):
+        modules = self.get_modules(surface_name)
+        capacities = list(
+            set([self.get_dict_instance([surface_name, module])['Parameters']['param_actual_capacity_Wp'] for module in
+                 modules]))
+        capacities.sort()
+        self.surface_capacities = capacities
+        return self.surface_capacities
 
     def get_submodule_map(self, surface_name, module_name):
         self.active_submodule_map = \
@@ -325,8 +341,6 @@ class Host:
 
         return pd.concat([pmp, irrad, area], axis=1)
 
-
-
     def solve_all_modules_iv_curve(self, surface):
 
         start_time = time.time()
@@ -349,20 +363,100 @@ class Host:
             G_diff_ann_mod = general.collect_raw_irradiance(pv_cells_xyz_arr, sensor_pts_xyz_arr, diffuse_irrad)
 
             G_eff_ann_mod = method_effective_irradiance.calculate_effective_irradiance_timeseries(G_dir_ann_mod,
-                                                                                              G_diff_ann_mod,
-                                                                                              module_dict['Details']['panelizer_normal'],
-                                                                                              self.all_hoy,
-                                                                                              self.tmy_location,
-                                                                                              psl,
-                                                                                              dbt,
-                                                                                              module_dict['Layers']['panelizer_front_film'])
-
-
+                                                                                                  G_diff_ann_mod,
+                                                                                                  module_dict[
+                                                                                                      'Details'][
+                                                                                                      'panelizer_normal'],
+                                                                                                  self.all_hoy,
+                                                                                                  self.tmy_location,
+                                                                                                  psl,
+                                                                                                  dbt,
+                                                                                                  module_dict['Layers'][
+                                                                                                      'panelizer_front_film'])
 
             Imod, Vmod = method_module_iv.solve_module_iv_curve(self, G_eff_ann_mod, module_dict, self.all_hoy, dbt)
             module_dict['Curves']['Imod'] = Imod
             module_dict['Curves']['Vmod'] = Vmod
+
+
+            Gmod = np.sum(G_eff_ann_mod * module_dict['Parameters']['param_one_cell_area_m2'], axis=1)
+            module_dict['Yield']['initial_simulation']['irrad'] = dict(zip(self.all_hoy, np.round(Gmod, 3)))
+
         # return Imod, Vmod
+
+    def string_surface(self, surface):
+        stringer.building_string_map(self, surface)
+
+    def string_building(self):
+        for surface in self.get_surfaces():
+            self.string_surface(surface)
+
+    def solve_string_iv_curves(self, surface, string):
+        method_topology_solver.solve_string_inverter_iv(self, surface, string)
+        method_topology_solver.solve_string_inverter_mpp(self, surface, string)
+
+    def solve_all_string_iv_curves(self, surface):
+        for string_key in self.get_string_keys(surface):
+            self.solve_string_iv_curves(surface, string_key)
+
+
+    def solve_all_string_iv_curves_building(self):
+        for surface in self.get_surfaces():
+            self.string_surface(surface)
+
+    def solve_surface_central_inverter(self, surface):
+        method_topology_solver.solve_central_inverter_iv(self, surface)
+        method_topology_solver.solve_central_inverter_mpp(self, surface)
+
+    def solve_all_central_inverter_building(self):
+        for surface in self.get_surfaces():
+            self.solve_surface_central_inverter(surface)
+
+    def write_key_parameters(self):
+        object_dict = self.get_dict_instance([])
+
+        object_capacity = []
+        object_area = []
+        object_cells_area = []
+        for surface in self.get_surfaces():
+            surface_dict = self.get_dict_instance([surface])
+
+            surface_capacity = []
+            surface_area = []
+            surface_cells_area = []
+            for string_key in self.get_string_keys(surface):
+                string_dict = self.get_dict_instance([surface])['Strings'][string_key]
+                modules = string_dict['modules']
+
+                string_capacity = []
+                string_area = []
+                string_cells_area = []
+                for module in modules:
+                    module_dict = self.get_dict_instance([surface, module])
+                    module_capacity = module_dict['Parameters']['param_actual_capacity_Wp']
+                    module_area = module_dict['Parameters']['param_actual_module_area_m2']
+                    module_cells_area = module_dict['Parameters']['param_actual_total_cell_area_m2']
+                    string_capacity.append(module_capacity)
+                    string_area.append(module_area)
+                    string_cells_area.append(module_cells_area)
+
+                string_dict['Details']['installed_capacity_Wp'] = np.sum(string_capacity)
+                string_dict['Details']['installed_area_m2'] = np.sum(string_area)
+                string_dict['Details']['installed_cell_area_m2'] = np.sum(string_cells_area)
+                surface_capacity.append(np.sum(string_capacity))
+                surface_area.append(np.sum(string_area))
+                surface_cells_area.append(np.sum(string_cells_area))
+
+            surface_dict['Details']['installed_capacity_Wp'] = np.sum(surface_capacity)
+            surface_dict['Details']['installed_area_m2'] = np.sum(surface_area)
+            surface_dict['Details']['installed_cell_area_m2'] = np.sum(surface_cells_area)
+            object_capacity.append(np.sum(surface_capacity))
+            object_area.append(np.sum(surface_area))
+            object_cells_area.append(np.sum(surface_cells_area))
+
+        object_dict['Details']['installed_capacity_Wp'] = np.sum(object_capacity)
+        object_dict['Details']['installed_area_m2'] = np.sum(object_area)
+        object_dict['Details']['installed_cell_area_m2'] = np.sum(object_cells_area)
 
     ######### EVERYTHING BELOW IS AN UNKNOWN AS OF 22 NOVEMBER 2023
     def calculate_module_curve(self, irradiance_hoy, temperature_hoy, submodule_map, subdiode_map):
@@ -430,56 +524,12 @@ class Host:
 
     def delete_cell_location(self):
         for surface in self.get_surfaces():
-            for string in self.get_strings(surface):
-                for module in self.get_modules(surface, string):
-                    module_dict = self.get_dict_instance([surface, string, module])
-                    module_dict.pop('CELLSXYZ', None)
-                    module_dict.pop('CELLS_NORMALS', None)
+            for module in self.get_modules(surface):
+                module_dict = self.get_dict_instance([surface, module])
+                module_dict.pop('CellsXYZ', None)
+                module_dict.pop('CellsNormals', None)
 
-    def write_key_parameters(self):
-        object_dict = self.get_dict_instance([])
 
-        object_capacity = []
-        object_area = []
-        object_cells_area = []
-        for surface in self.get_surfaces():
-            surface_dict = self.get_dict_instance([surface])
-
-            surface_capacity = []
-            surface_area = []
-            surface_cells_area = []
-            for string_ in self.get_strings(surface):
-                string_dict = self.get_dict_instance([surface, string_])
-
-                string_capacity = []
-                string_area = []
-                string_cells_area = []
-                for module in self.get_modules(surface, string_):
-                    module_dict = self.get_dict_instance([surface, string_, module])
-                    module_capacity = module_dict['PARAMETERS']['actual_capacity_Wp']
-                    module_area = module_dict['PARAMETERS']['actual_module_area_m2']
-                    module_cells_area = module_dict['PARAMETERS']['actual_cell_area_m2']
-                    string_capacity.append(module_capacity)
-                    string_area.append(module_area)
-                    string_cells_area.append(module_cells_area)
-
-                string_dict['DETAILS']['installed_capacity_Wp'] = np.sum(string_capacity)
-                string_dict['DETAILS']['installed_area_m2'] = np.sum(string_area)
-                string_dict['DETAILS']['installed_cell_area_m2'] = np.sum(string_cells_area)
-                surface_capacity.append(np.sum(string_capacity))
-                surface_area.append(np.sum(string_area))
-                surface_cells_area.append(np.sum(string_cells_area))
-
-            surface_dict['DETAILS']['installed_capacity_Wp'] = np.sum(surface_capacity)
-            surface_dict['DETAILS']['installed_area_m2'] = np.sum(surface_area)
-            surface_dict['DETAILS']['installed_cell_area_m2'] = np.sum(surface_cells_area)
-            object_capacity.append(np.sum(surface_capacity))
-            object_area.append(np.sum(surface_area))
-            object_cells_area.append(np.sum(surface_cells_area))
-
-        object_dict['DETAILS']['installed_capacity_Wp'] = np.sum(object_capacity)
-        object_dict['DETAILS']['installed_area_m2'] = np.sum(object_area)
-        object_dict['DETAILS']['installed_cell_area_m2'] = np.sum(object_cells_area)
 
     def solve_system(self, surface, hoy):
         if self.topology == 'central_inverter':
@@ -498,23 +548,23 @@ class Host:
         elif self.topology == 'central_inverter':
             self.write_central_inverter(surface)
         elif self.topology == 'micro_inverter':
-            self.write_micro_inverter(surface, string)
+            self.write_micro_inverter(surface)
 
-    def write_micro_inverter(self, surface, string):
+    def write_micro_inverter(self, surface):
 
-        for module in self.get_modules(surface, string):
+        for module in self.get_modules(surface):
 
-            module_dict = self.get_dict_instance([surface, string, module])
+            module_dict = self.get_dict_instance([surface, module])
             mpp_results_dict = topology_solver.solve_micro_inverter_mpp(self, module_dict)
 
             # write these results to the module dict
             for hoy in self.all_hoy:
                 module_dict[
-                    'YIELD'][self.topology]['imp'].update({hoy: mpp_results_dict[hoy]['imp']})
+                    'Yield'][self.topology]['imp'].update({hoy: mpp_results_dict[hoy]['imp']})
                 module_dict[
-                    'YIELD'][self.topology]['vmp'].update({hoy: mpp_results_dict[hoy]['vmp']})
+                    'Yield'][self.topology]['vmp'].update({hoy: mpp_results_dict[hoy]['vmp']})
                 module_dict[
-                    'YIELD'][self.topology]['pmp'].update({hoy: mpp_results_dict[hoy]['pmp']})
+                    'Yield'][self.topology]['pmp'].update({hoy: mpp_results_dict[hoy]['pmp']})
                 # module_dict[
                 #     'YIELD'][self.topology]['isc'].update({hoy: mpp_results_dict[hoy]['isc']})
                 # module_dict[
@@ -684,18 +734,18 @@ class Host:
                     module_yield_dict.pop('isc', None)
                     module_yield_dict.pop('voc', None)
 
-    def write_up_string_results(self, surface, string):
+    def write_up_string_results(self, surface, string_key):
 
-        string_dict = self.get_dict_instance([surface, string])['YIELD'][self.topology]
+        string_dict = self.get_dict_instance([surface])['Strings'][string_key]['YIELD'][self.topology]
         # if self.topology == 'micro_inverter':
         #     string_dict = copy.deepcopy(self.get_dict_instance([surface, string])['YIELD']['string_inverter'])
 
-        sub_dict = self.get_dict_instance([surface, string])['MODULES']
+        sub_dict = self.get_dict_instance([surface, string_key])['MODULES']
 
         for key in string_dict.keys():
             key_result = general.gather_sublevel_results(self,
                                                          sub_dict,
-                                                         self.get_modules(surface, string),
+                                                         self.get_modules(surface, string_key),
                                                          key)
             string_dict[key].update(key_result)
 
@@ -776,7 +826,8 @@ class Host:
         for key in result_dict.keys():
 
             result_series = pd.Series(result_dict[key], dtype='float')
-            hoy_index = pd.Series(np.arange(0, 8760, 1), name='HOY')
+            hoy_index = self.all_hoy #pd.Series(np.arange(0, 8760, 1), name='HOY')
+
             result_df = pd.concat([hoy_index, result_series], axis=1)
             result = result_df[0].rename(key)
 

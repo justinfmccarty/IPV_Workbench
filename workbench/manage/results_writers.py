@@ -105,67 +105,131 @@ def write_building_results_simple_timeseries(host, topology):
     return building_target_file
 
 
-def write_building_results_timeseries(po, scenario, topology):
-    year = scenario.split("_")[-1]
-
-    # load demand profile
-    electricity_load = pd.read_csv(os.path.join(po.RESOURCES_DIR, "loads", "annual_building_demand_time_period.csv"))[
-        f"grid_demand_kwh_{year}"]
-    electricity_load_timeseries = electricity_load.values
-
-    # set result file
-    building_target_file = os.path.join(po.RESULTS_DIR, 'timeseries',
-                                        f"{scenario}_{topology}_building_level_results_hourly.csv")
-    io.directory_creator(Path(building_target_file).parent)
+def write_building_results_timeseries(host, topology):
     # building level results
     results_dict = {}
 
-    # overall_results
-    object_dict = po.get_dict_instance([])
-    object_capacity_w = object_dict['DETAILS']['installed_capacity_Wp']
-    object_capacity_kw = object_capacity_w / 1000
-    object_area = object_dict['DETAILS']['installed_area_m2']
+    scenario = host.project.management_scenario_name
+    year = scenario.split("_")[-1]
+    electricity_loads = host.project.HOST_STATIONARY_LOADS
+    if os.path.exists(electricity_loads):
+        ignore_demand = False
+        electricity_load = pd.read_csv(electricity_loads)[f"grid_demand_kwh_{year}"]
+        electricity_load_timeseries = electricity_load.values
+        results_dict.update({"electricity_demand_building_kwh": electricity_load_timeseries})
+    else:
+        ignore_demand = True
+        print("File containing electricity loads not found. Results that require this input will not be calculated")
+    # set result file
+    building_target_file = os.path.join(host.project.GENERAL_RESULTS_DIR,
+                                        f"{scenario}_{topology}_building_level_results_hourly.csv")
+    io.directory_creator(Path(building_target_file).parent)
 
-    results_dict.update(
-        {f"index": po.get_tabular_results([], topology=topology, analysis_period=None, rename_cols=False)[
-            ['pmp']].index})
 
-    generation_total_wh = po.get_tabular_results([], topology=topology, analysis_period=None, rename_cols=False)[
-        ['pmp']].values.flatten()
-    generation_total_kwh = generation_total_wh / 1000
-    results_dict.update({f"electricity_gen_bulk_building_kwh": generation_total_kwh})
 
-    # add electricity demand (although it is overwritten at the end
-    results_dict.update({"electricity_demand_building_kwh": electricity_load_timeseries})
 
-    object_specific_yield = generation_total_kwh / object_capacity_kw
-    results_dict.update({f"electricity_specific_yield_building_kwh_kwp": object_specific_yield})
 
-    object_generation_intensity = generation_total_kwh / object_area
-    results_dict.update({f"electricity_gen_intensity_building_kwh": object_generation_intensity})
+    # # overall_results
+    # object_dict = host.get_dict_instance([])
+    # object_capacity_w = object_dict['Details']['installed_capacity_Wp']
+    # object_capacity_kw = object_capacity_w / 1000
+    # object_area = object_dict['Details']['installed_area_m2']
+    #
+    # results_dict.update(
+    #     {f"index": po.get_tabular_results([], topology=topology, analysis_period=None, rename_cols=False)[
+    #         ['pmp']].index})
+    #
+    # generation_total_wh = po.get_tabular_results([], topology=topology, analysis_period=None, rename_cols=False)[
+    #     ['pmp']].values.flatten()
+    # generation_total_kwh = generation_total_wh / 1000
+    # results_dict.update({f"electricity_gen_bulk_building_kwh": generation_total_kwh})
+    #
+    # # add electricity demand (although it is overwritten at the end
+    # results_dict.update({"electricity_demand_building_kwh": electricity_load_timeseries})
+    #
+    # object_specific_yield = generation_total_kwh / object_capacity_kw
+    # results_dict.update({f"electricity_specific_yield_building_kwh_kwp": object_specific_yield})
+    #
+    # object_generation_intensity = generation_total_kwh / object_area
+    # results_dict.update({f"electricity_gen_intensity_building_kwh": object_generation_intensity})
 
     # surface_level_results
     surface_irrad = []
-    for surface in po.get_surfaces():
-        surface_dict = po.get_dict_instance([surface])
+    for surface in host.get_surfaces()[0:1]:
+        surface = '{1008;0}'
+        surface_dict = host.get_dict_instance([surface])
         surface_clean = general.clean_grasshopper_key(surface)
-        general_dir = surface_dict['DETAILS']['general_angle']
+        general_dir = surface_dict['Details']['general_angle']
 
         # generation
-        generation_surface_wh = \
-            po.get_tabular_results([surface], topology=topology, analysis_period=None, rename_cols=False)[
-                ['pmp']].values.flatten()
+        if topology=='micro_inverter':
+            modules = list(surface_dict['Modules'].keys())
+            generation_surface_wh = []
+            for module in modules:
+                module_dict = host.get_dict_instance([surface, module])
+                module_results = [pd.Series(module_dict['Yield'][topology][hoy]) for hoy in host.all_hoy]
+                module_yield_df = pd.concat(module_results, axis=1).transpose()
+                generation_surface_wh.append(module_yield_df['pmp'])
+            generation_surface_wh = pd.concat(generation_surface_wh, axis=1).sum(axis=1)
+        elif topology=='string_inverter':
+            # modules = list(surface_dict['Modules'].keys())
+
+            generation_surface_wh = []
+
+            for string_key in surface_dict['Strings'].keys():
+                string_dict = surface_dict['Strings'][string_key]
+                generation_surface_wh.append(pd.Series(string_dict['Yield']['pmp']))
+
+                # string_modules = surface_dict['Strings'][string_key]['modules']
+                # for module in string_modules:
+                # module_dict = host.get_dict_instance([surface, module])
+                # module_results = [pd.Series(module_dict['Yield'][topology][hoy]) for hoy in host.all_hoy]
+                # module_yield_df = pd.concat(module_results, axis=1).transpose()
+                # generation_surface_wh.append(module_yield_df['pmp'])
+            generation_surface_wh = pd.concat(generation_surface_wh, axis=1).sum(axis=1)
+
+        else:
+            generation_surface_wh = pd.Series(surface_dict['Yield'][topology]['pmp'])
+                # host.get_tabular_results([surface], topology=topology, analysis_period=None, rename_cols=False)[
+                #     ['pmp']].values.flatten()
+
         generation_surface_kwh = generation_surface_wh / 1000
         results_dict.update({f"electricity_gen_bulk_{surface_clean}_{general_dir}_kwh": generation_surface_kwh})
 
+        # irradiance
+        try:
+            surface_irradiance_w = surface_dict['Details']['installed_capacity_Wp']
+        except KeyError:
+            surface_irradiance_w = []
+
+            for module in surface_dict['Modules'].keys():
+                surface_irradiance_w.append(pd.Series(surface_dict['Modules'][module]['Yield']['irrad']))
+            surface_irradiance_w = pd.concat(surface_irradiance_w, axis=1).sum(axis=1)
+        surface_irradiance_kwh = surface_irradiance_w / 1000
+        results_dict.update({f"irrad_bulk_{surface_clean}_{general_dir}_kwh": surface_irradiance_kwh})
+
         # capacity
-        surface_capacity_w = surface_dict['DETAILS']['installed_capacity_Wp']
+        try:
+            surface_capacity_w = surface_dict['Details']['installed_capacity_Wp']
+        except KeyError:
+            surface_capacity_w = []
+            for module in surface_dict['Modules'].keys():
+                surface_capacity_w.append(surface_dict['Modules'][module]['Parameters']['param_actual_capacity_Wp'])
+            surface_capacity_w = np.sum(surface_capacity_w)
         surface_capacity_kw = surface_capacity_w / 1000
+
         results_dict.update({f"surface_capacity_{surface_clean}_{general_dir}_kwp": [surface_capacity_kw] * len(
             generation_surface_kwh)})
 
         # area
-        surface_area = surface_dict['DETAILS']['installed_area_m2']
+        try:
+            surface_area = surface_dict['Details']['installed_area_m2']
+        except KeyError:
+            surface_area = []
+            for module in surface_dict['Modules'].keys():
+                surface_area.append(surface_dict['Modules'][module]['Parameters']['param_actual_module_area_m2'])
+            surface_area = np.sum(surface_area)
+
         results_dict.update(
             {f"surface_area_{surface_clean}_{general_dir}_m2": [surface_area] * len(generation_surface_kwh)})
 
@@ -181,42 +245,46 @@ def write_building_results_timeseries(po, scenario, topology):
 
         # efficiency
         # surface_efficiency = np.fromiter(surface_dict['YIELD'][topology]['eff'].values(), dtype=float)
+        # surface_effiency_series = pd.Series(surface_dict['Yield'][topology]['eff'])
+        # hoy_index = pd.Series(np.arange(0, 8760, 1), name='HOY')
+        # surface_effiency_annual_df = pd.concat([hoy_index, surface_effiency_series], axis=1)
+        # surface_efficiency = surface_effiency_annual_df[0].values
 
-        surface_effiency_series = pd.Series(surface_dict['YIELD'][topology]['eff'])
-        hoy_index = pd.Series(np.arange(0, 8760, 1), name='HOY')
-        surface_effiency_annual_df = pd.concat([hoy_index, surface_effiency_series], axis=1)
-        surface_efficiency = surface_effiency_annual_df[0].values
-        results_dict.update({f"efficiency_{surface_clean}_{general_dir}_yield_irrad": surface_efficiency})
+        # results_dict.update({f"efficiency_{surface_clean}_{general_dir}_yield_irrad": round(generation_surface_kwh / surface_irradiance_kwh,3)})
 
         # print(surface_efficiency.max())
         # surface_irrad_kwh = np.fromiter(surface_dict['YIELD'][topology]['irrad'].values(), dtype=float) / 1000
 
-        # irradiance
-        surface_irrad_wh_series = pd.Series(surface_dict['YIELD'][topology]['irrad'])
-        hoy_index = pd.Series(np.arange(0, 8760, 1), name='HOY')
-        surface_irrad_wh_annual_df = pd.concat([hoy_index, surface_irrad_wh_series], axis=1)
-        surface_irrad_kwh = surface_irrad_wh_annual_df[0].values / 1000
-        surface_irrad.append(surface_irrad_kwh)
-        results_dict.update({f"irrad_bulk_{surface_clean}_{general_dir}_kwh": surface_irrad_kwh})
+        # # irradiance
+        # surface_irrad_wh_series = pd.Series(surface_dict['Yield'][topology]['irrad'])
+        # hoy_index = pd.Series(np.arange(0, 8760, 1), name='HOY')
+        # surface_irrad_wh_annual_df = pd.concat([hoy_index, surface_irrad_wh_series], axis=1)
+        # surface_irrad_kwh = surface_irrad_wh_annual_df[0].values / 1000
+        # surface_irrad.append(surface_irrad_kwh)
+        # results_dict.update({f"irrad_bulk_{surface_clean}_{general_dir}_kwh": surface_irrad_kwh})
 
         # rad intensity
-        surface_irrad_intensity_kwh = surface_irrad_kwh / surface_area
+        surface_irrad_intensity_kwh = surface_irradiance_kwh / surface_area
         results_dict.update({f"irrad_intensity_{surface_clean}_{general_dir}_kwh_m2": surface_irrad_intensity_kwh})
 
         # self sufficiency, consumption
-        self_suff, self_cons = results.calc_self_sufficiency_consumption(electricity_load_timeseries,
-                                                                         generation_surface_kwh)
-        results_dict.update({f"self_sufficiency_{surface_clean}_{general_dir}_percent": self_suff})
-        results_dict.update({f"self_consumption_{surface_clean}_{general_dir}_percent": self_cons})
+        if ignore_demand == False:
+            self_suff, self_cons = results.calc_self_sufficiency_consumption(electricity_load_timeseries,
+                                                                             generation_surface_kwh)
+            results_dict.update({f"self_sufficiency_{surface_clean}_{general_dir}_percent": self_suff})
+            results_dict.update({f"self_consumption_{surface_clean}_{general_dir}_percent": self_cons})
+        else:
+            results_dict.update({f"self_sufficiency_{surface_clean}_{general_dir}_percent": np.zeros_like(generation_surface_kwh)})
+            results_dict.update({f"self_consumption_{surface_clean}_{general_dir}_percent": np.zeros_like(generation_surface_kwh)})
 
         # index datetime
-        results_dict.update({"index": temporal.hoy_to_date(np.arange(0, 8760, 1))})
+        results_dict.update({"index": temporal.hoy_to_date(host.all_hoy)})
 
     results_dict.update({f"irrad_whole_building_kwh": np.sum(surface_irrad, axis=0)})
     df = pd.DataFrame(results_dict).set_index("index").round(3)
 
-    sunup_array_sorted = np.sort(po.sunup_array)
-    sundown_array_sorted = np.sort(po.sundown_array)
+    sunup_array_sorted = np.sort(host.project.sunup_array)
+    sundown_array_sorted = np.sort(host.project.sundown_array)
 
     sunup_df = df.iloc[sunup_array_sorted].copy()
     sunup_df.replace(0, np.nan, inplace=True)
@@ -224,12 +292,20 @@ def write_building_results_timeseries(po, scenario, topology):
     sundown_df = df.iloc[sundown_array_sorted].fillna(0).copy()
 
     final_df = pd.concat([sunup_df, sundown_df]).sort_index()
-    final_df["electricity_demand_building_kwh"] = electricity_load_timeseries
-    # self sufficiency, consumption
-    self_suff, self_cons = results.calc_self_sufficiency_consumption(electricity_load_timeseries, final_df[
-        "electricity_gen_bulk_building_kwh"].values)
-    final_df["self_sufficiency_building_percent"] = self_suff
-    final_df["self_consumption_building_percent"] = self_cons
+    if ignore_demand == False:
+        final_df["electricity_demand_building_kwh"] = electricity_load_timeseries
+
+        # self sufficiency, consumption
+        self_suff, self_cons = results.calc_self_sufficiency_consumption(electricity_load_timeseries, final_df[
+            "electricity_gen_bulk_building_kwh"].values)
+
+        final_df["self_sufficiency_building_percent"] = self_suff
+        final_df["self_consumption_building_percent"] = self_cons
+    else:
+        final_df["electricity_demand_building_kwh"] = 0
+        final_df["self_sufficiency_building_percent"] = 0
+        final_df["self_consumption_building_percent"] = 0
+
     final_df.to_csv(building_target_file)
     print(f"Saved results CSV to\n{building_target_file}.")
     return building_target_file

@@ -183,7 +183,7 @@ def calcMPP_IscVocFF(Isys, Vsys):
                 # Isc = np.interp(np.float64(0), Vsys, Isys)  # calculate Isc
                 # FF = Pmp / Isc / Voc
 
-    return dict(zip(['imp', 'vmp', 'pmp'], [Imp, Vmp, Pmp]))
+    return dict(zip(['imp', 'vmp', 'pmp'], [round(Imp, 3), round(Vmp, 3), round(Pmp, 3)]))
 
 
 def simulation_central_inverter(panelizer_object, surface, hoy):

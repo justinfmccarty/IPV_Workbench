@@ -340,7 +340,7 @@ def build_parameter_dict(module_dict, custom_module_data):
 
     base_parameters['param_actual_capacity_Wp'] = watts_cell * base_parameters['param_total_cells']
 
-    m2_cell = base_parameters['general_cell_area_mm2_typical'] * 0.000001
+    m2_cell = base_parameters['general_cell_area_mm2_typical'] * 1e-6
     base_parameters['param_one_cell_area_m2'] = m2_cell
     cell_coverage_typical = (m2_cell * ideal_cell_count) / base_parameters['module_shape_area_m2']
     base_parameters['param_actual_total_cell_area_m2'] = base_parameters['param_one_cell_area_m2'] * base_parameters[
@@ -374,6 +374,12 @@ def build_parameter_dict(module_dict, custom_module_data):
 
     # module_dict['PARAMETERS'] = base_parameters.to_dict()
     # base_parameters = base_parameters.to_dict()
+    for k,v in base_parameters.items():
+        if type(v) == float:
+            if ("bishop" in k) or ("desoto" in k):
+                base_parameters[k] = v
+            else:
+                base_parameters[k] = round(v, 3)
     return base_parameters
 
 
@@ -413,5 +419,12 @@ def find_device_map(device_paramaters, project_manager, map_type='submodule'):
     device_orientation = device_paramaters['shape_orientation']
     file_name = f"{device_name}_{device_orientation}_maps"
     file_path = [fp for fp in project_manager.MAP_FILES if file_name in fp][0]
-    df = pd.read_excel(file_path, header=None, sheet_name=map_type).to_numpy()  # .tolist()
-    return df
+    map_arr = pd.read_excel(file_path, header=None, sheet_name=map_type).to_numpy()  # .tolist()
+    if len(map_arr)==0:
+        pass
+    else:
+        map_arr = map_arr[0:device_paramaters['panelizer_n_rows'],
+                           0:device_paramaters['panelizer_n_cols']
+                           ]
+
+    return map_arr
