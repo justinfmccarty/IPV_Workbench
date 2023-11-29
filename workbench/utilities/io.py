@@ -8,6 +8,7 @@ import shutil
 import glob
 import pvlib
 import pandas as pd
+import calendar
 from workbench.utilities import temporal, general
 
 
@@ -205,6 +206,9 @@ def read_epw(path_data, create_timeseries=True):
                      index_col=False,
                      usecols=list(range(0, 35)),
                      names=tmy_labels)  # .drop('datasource', axis=1)
+
+    if calendar.isleap(df['year'].tolist()[0]):
+        df['year'] += 1
 
     df['hour'] = df['hour'].astype(int)
     if df['hour'][0] == 1:
