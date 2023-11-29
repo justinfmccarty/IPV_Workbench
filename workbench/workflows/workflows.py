@@ -170,8 +170,6 @@ def comprehensive_surface_analysis(host_object):
     # in case a manual edit was made
     host_object.project.update_cfg()
 
-    # run mpp solvers
-
     for topology in ['micro_inverter', 'string_inverter', 'central_inverter']:
         run_topology_solver(host_object, topology)
         results_writers.write_building_results_timeseries(host_object, topology)
