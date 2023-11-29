@@ -9,11 +9,10 @@ import openpyxl
 
 def write_building_results_simple_timeseries(host, topology):
     scenario = host.project.management_scenario_name
-    year = scenario.split("_")[-1]
     electricity_loads = host.project.HOST_STATIONARY_LOADS
     if os.path.exists(electricity_loads):
         ignore_demand = False
-        electricity_load = pd.read_csv(electricity_loads)[f"grid_demand_kwh_{year}"]
+        electricity_load = pd.read_csv(electricity_loads)[f"grid_demand_kwh"]
         electricity_load_timeseries = electricity_load.values
     else:
         ignore_demand = True
@@ -110,11 +109,10 @@ def write_building_results_timeseries(host, topology):
     results_dict = {}
 
     scenario = host.project.management_scenario_name
-    year = scenario.split("_")[-1]
     electricity_loads = host.project.HOST_STATIONARY_LOADS
     if os.path.exists(electricity_loads):
         ignore_demand = False
-        electricity_load = pd.read_csv(electricity_loads)[f"grid_demand_kwh_{year}"]
+        electricity_load = pd.read_csv(electricity_loads)[f"grid_demand_kwh"]
         electricity_load_timeseries = electricity_load.values
         results_dict.update({"electricity_demand_building_kwh": electricity_load_timeseries})
     else:
