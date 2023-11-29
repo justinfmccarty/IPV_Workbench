@@ -826,7 +826,7 @@ class Host:
         for key in result_dict.keys():
 
             result_series = pd.Series(result_dict[key], dtype='float')
-            hoy_index = self.all_hoy #pd.Series(np.arange(0, 8760, 1), name='HOY')
+            hoy_index = pd.Series(self.all_hoy) #pd.Series(np.arange(0, 8760, 1), name='HOY')
 
             result_df = pd.concat([hoy_index, result_series], axis=1)
             result = result_df[0].rename(key)
