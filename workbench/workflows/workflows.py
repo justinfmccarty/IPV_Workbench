@@ -151,9 +151,11 @@ def run_topology_solver(host_object, topology):
                 # if not then run the rule-based stringer
                 host_object.string_surface(surface)
             for string_key in host_object.get_string_keys(surface):
+                method_topology_solver.solve_string_inverter_iv(host_object, surface, string_key)
                 res = method_topology_solver.solve_string_inverter_mpp(host_object, surface, string_key)
 
         elif topology=='central_inverter':
+            method_topology_solver.solve_central_inverter_iv(host_object, surface)
             res = method_topology_solver.solve_central_inverter_mpp(host_object, surface)
         else:
             print("Arg 'topology' must be specified as one of 'micro_inverter', 'string_inverter', or 'central_inverter'."

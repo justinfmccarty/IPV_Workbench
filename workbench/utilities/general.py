@@ -396,3 +396,10 @@ def find_nearest(array, value):
     array = np.asarray(array)
     idx = (np.abs(array - value)).argmin()
     return '%.2f' % array[idx]
+
+
+def divide_zero_array(a, b):
+    return np.divide(a, b, out=np.zeros_like(a), where=b != 0)
+
+def is_pd_series(variable):
+    return isinstance(variable, pd.Series)

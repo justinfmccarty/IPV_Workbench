@@ -357,31 +357,34 @@ class Host:
 
         modules = self.get_modules(surface)
         for module_name in modules:
-            print(f"Solving module {module_name}.")
             module_dict = self.get_dict_instance([surface, module_name])
-            pv_cells_xyz_arr = np.array(self.get_cells_xyz(surface, module_name))
-            G_dir_ann_mod = general.collect_raw_irradiance(pv_cells_xyz_arr, sensor_pts_xyz_arr, direct_irrad)
-            G_diff_ann_mod = general.collect_raw_irradiance(pv_cells_xyz_arr, sensor_pts_xyz_arr, diffuse_irrad)
+            if (len(module_dict['Curves']['Imod'])==len(self.all_hoy)) & (len(module_dict['Curves']['Vmod'])==len(self.all_hoy)):
+                print(f"Module {module_name} was already solved. Skipping")
+            else:
+                print(f"Solving module {module_name}.")
 
-            G_eff_ann_mod = method_effective_irradiance.calculate_effective_irradiance_timeseries(G_dir_ann_mod,
-                                                                                                  G_diff_ann_mod,
-                                                                                                  module_dict[
-                                                                                                      'Details'][
-                                                                                                      'panelizer_normal'],
-                                                                                                  self.all_hoy,
-                                                                                                  self.tmy_location,
-                                                                                                  psl,
-                                                                                                  dbt,
-                                                                                                  module_dict['Layers'][
-                                                                                                      'panelizer_front_film'])
+                pv_cells_xyz_arr = np.array(self.get_cells_xyz(surface, module_name))
+                G_dir_ann_mod = general.collect_raw_irradiance(pv_cells_xyz_arr, sensor_pts_xyz_arr, direct_irrad)
+                G_diff_ann_mod = general.collect_raw_irradiance(pv_cells_xyz_arr, sensor_pts_xyz_arr, diffuse_irrad)
 
-            Imod, Vmod = method_module_iv.solve_module_iv_curve(self, G_eff_ann_mod, module_dict, self.all_hoy, dbt)
-            module_dict['Curves']['Imod'] = Imod
-            module_dict['Curves']['Vmod'] = Vmod
+                G_eff_ann_mod = method_effective_irradiance.calculate_effective_irradiance_timeseries(G_dir_ann_mod,
+                                                                                                      G_diff_ann_mod,
+                                                                                                      module_dict[
+                                                                                                          'Details'][
+                                                                                                          'panelizer_normal'],
+                                                                                                      self.all_hoy,
+                                                                                                      self.tmy_location,
+                                                                                                      psl,
+                                                                                                      dbt,
+                                                                                                      module_dict['Layers'][
+                                                                                                          'panelizer_front_film'])
 
+                Imod, Vmod = method_module_iv.solve_module_iv_curve(self, G_eff_ann_mod, module_dict, self.all_hoy, dbt)
+                module_dict['Curves']['Imod'] = Imod
+                module_dict['Curves']['Vmod'] = Vmod
 
-            Gmod = np.sum(G_eff_ann_mod * module_dict['Parameters']['param_one_cell_area_m2'], axis=1)
-            module_dict['Yield']['initial_simulation']['irrad'] = dict(zip(self.all_hoy, np.round(Gmod, 3)))
+                Gmod = np.sum(G_eff_ann_mod * module_dict['Parameters']['param_one_cell_area_m2'], axis=1)
+                module_dict['Yield']['initial_simulation']['irrad'] = dict(zip(self.all_hoy, np.round(Gmod, 3)))
 
         total_time = round(time.time() - start_time, 2)
         self.project.log(total_time, "module-iv-curves")

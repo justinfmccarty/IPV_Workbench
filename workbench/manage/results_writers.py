@@ -152,9 +152,8 @@ def write_building_results_timeseries(host, topology):
     # results_dict.update({f"electricity_gen_intensity_building_kwh": object_generation_intensity})
 
     # surface_level_results
-    surface_irrad = []
-    for surface in host.get_surfaces()[0:1]:
-        surface = '{1008;0}'
+
+    for surface in host.get_surfaces():
         surface_dict = host.get_dict_instance([surface])
         surface_clean = general.clean_grasshopper_key(surface)
         general_dir = surface_dict['Details']['general_angle']
@@ -195,14 +194,11 @@ def write_building_results_timeseries(host, topology):
         results_dict.update({f"electricity_gen_bulk_{surface_clean}_{general_dir}_kwh": generation_surface_kwh})
 
         # irradiance
-        try:
-            surface_irradiance_w = surface_dict['Details']['installed_capacity_Wp']
-        except KeyError:
-            surface_irradiance_w = []
+        surface_irradiance_w = []
 
-            for module in surface_dict['Modules'].keys():
-                surface_irradiance_w.append(pd.Series(surface_dict['Modules'][module]['Yield']['irrad']))
-            surface_irradiance_w = pd.concat(surface_irradiance_w, axis=1).sum(axis=1)
+        for module in surface_dict['Modules'].keys():
+            surface_irradiance_w.append(pd.Series(surface_dict['Modules'][module]['Yield']['initial_simulation']['irrad']))
+        surface_irradiance_w = pd.concat(surface_irradiance_w, axis=1).sum(axis=1)
         surface_irradiance_kwh = surface_irradiance_w / 1000
         results_dict.update({f"irrad_bulk_{surface_clean}_{general_dir}_kwh": surface_irradiance_kwh})
 
@@ -278,7 +274,13 @@ def write_building_results_timeseries(host, topology):
         # index datetime
         results_dict.update({"index": temporal.hoy_to_date(host.all_hoy)})
 
+
+    surface_irrad = [results_dict[dict_key] for dict_key in results_dict.keys() if "irrad_bulk" in dict_key]
+
     results_dict.update({f"irrad_whole_building_kwh": np.sum(surface_irrad, axis=0)})
+    surface_gen = [results_dict[dict_key] for dict_key in results_dict.keys() if "electricity_gen_bulk" in dict_key]
+    results_dict.update({f"electricity_gen_bulk_building_kwh": np.sum(surface_gen, axis=0)})
+
     df = pd.DataFrame(results_dict).set_index("index").round(3)
 
     sunup_array_sorted = np.sort(host.project.sunup_array)
