@@ -20,6 +20,7 @@ def write_building_results_simple_timeseries(host, topology):
     # set result file
     building_target_file = os.path.join(host.project.GENERAL_RESULTS_DIR,
                                         f"{scenario}_{topology}_building_level_results_hourly.csv")
+    print(building_target_file)
     io.directory_creator(Path(building_target_file).parent)
 
     results_dict = {}
@@ -43,9 +44,11 @@ def write_building_results_simple_timeseries(host, topology):
         generation_surface_kwh = generation_surface_wh / 1000
         results_dict.update({f"electricity_gen_bulk_{surface_clean}_{general_dir}_kwh": generation_surface_kwh})
 
+
         # irradiance
         irrad_surface_wh = surface_df['irrad'].values.flatten()
         surface_irrad_kwh = irrad_surface_wh / 1000
+
         results_dict.update({f"irrad_bulk_{surface_clean}_{general_dir}_kwh": surface_irrad_kwh})
 
         # self sufficiency, consumption

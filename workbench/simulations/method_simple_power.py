@@ -92,6 +92,7 @@ def module_cell_pt(module_dict, pv_cells_xyz_arr, sensor_pts_xyz_arr, direct, di
     peak_power = module_dict['Parameters']['param_cell_peak_Wp']
     area_cell = module_dict['Parameters']['param_one_cell_area_m2']
     module_area = module_dict['Parameters']['param_actual_module_area_m2']
+    area_cells = module_dict['Parameters']['param_actual_total_cell_area_m2']
     module_normal = module_dict['Details']['panelizer_normal']
     gamma_ref = module_dict['Parameters']['performance_temp_coe_gamma_pctC']
 
@@ -134,7 +135,7 @@ def module_cell_pt(module_dict, pv_cells_xyz_arr, sensor_pts_xyz_arr, direct, di
         Pmod_results[hoy] = np.sum(Pcells)
 
         # For area
-        area_results[hoy] = module_area
+        area_results[hoy] = area_cells
 
         # For irradiance
         # Gmod is originally an array of W/m2 for each cell. Need to convert this array to W by multiply by cell area

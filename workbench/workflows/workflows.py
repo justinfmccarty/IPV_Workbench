@@ -67,6 +67,7 @@ def run_irradiance(host, overwrite=True):
 
 
 def run_module_point(host_object, point_resolution):
+    start_time = time.time()
     if point_resolution == 'center_point':
         pass
     elif point_resolution == 'cell_point':
@@ -88,21 +89,20 @@ def run_module_point(host_object, point_resolution):
         # clean curly brackets
         surface_c = general.clean_grasshopper_key(surface)
         print(f"Starting module {point_resolution} analysis workflow for surface {surface_c}.")
-        start_time = time.time()
+        start_time_loop = time.time()
         # change surface
         host_object.project.edit_cfg_file('analysis', 'active_surface', surface_c)
         # run method
         if point_resolution == 'center_point':
-            print(surface)
             host_object.solve_module_center_pts(surface)
         elif point_resolution == 'cell_point':
             host_object.solve_module_cell_pts(surface)
-        total_time = round(time.time() - start_time, 2)
-        print(f"Completed in {total_time} seconds.")
+        total_time_loop = round(time.time() - start_time_loop, 2)
+        print(f"Completed in {total_time_loop} seconds.")
         print("-----------------------")
 
     print(f"Cumulating and saving results for host object.")
-    start_time = time.time()
+
     results_writers.write_building_results_simple_timeseries(host_object, point_resolution)
     total_time = round(time.time() - start_time, 2)
     print(f"Completed in {total_time} seconds.")
