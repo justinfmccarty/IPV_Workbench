@@ -418,7 +418,7 @@ def find_device_map(device_paramaters, project_manager, map_type='submodule'):
     device_name = device_paramaters['general_device_summary']
     device_orientation = device_paramaters['shape_orientation']
     file_name = f"{device_name}_{device_orientation}_maps"
-    file_path = [fp for fp in project_manager.MAPS_DIR if file_name in fp][0]
+    file_path = [fp for fp in project_manager.LOCAL_MAPS_FILES if file_name in fp][0]
     map_arr = pd.read_excel(file_path, header=None, sheet_name=map_type).to_numpy()  # .tolist()
     if len(map_arr)==0:
         pass

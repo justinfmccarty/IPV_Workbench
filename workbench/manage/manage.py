@@ -149,6 +149,7 @@ class Project:
 
         self.MAPS_DIR = os.path.join(self.MODULE_CELL_DIR, "map_files")
         io.directory_creator(self.MAPS_DIR)
+        self.LOCAL_MAPS_FILES = glob.glob(os.path.join(self.MAPS_DIR, "*.xls*"))
 
         default_maps = os.path.join(library_root, "device", "default_devices", "map_files")
         self.MAP_FILES = glob.glob(os.path.join(default_maps, "*.xls*"))
