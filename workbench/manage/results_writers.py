@@ -13,7 +13,7 @@ def write_building_results_simple_timeseries(host, topology):
     if os.path.exists(electricity_loads):
         ignore_demand = False
         electricity_load = pd.read_csv(electricity_loads)[f"grid_demand_kwh"]
-        electricity_load_timeseries = electricity_load.values
+        electricity_load_timeseries = electricity_load.values[host.analysis_period]
     else:
         ignore_demand = True
         print("File containing electricity loads not found. Results that require this input will not be calculated")
@@ -73,7 +73,7 @@ def write_building_results_simple_timeseries(host, topology):
         results_dict.update({f"irrad_intensity_{surface_clean}_{general_dir}_kwh_m2": surface_irrad_intensity_kwh})
 
         # index datetime
-        results_dict.update({"index": temporal.hoy_to_date(np.arange(0, 8760, 1))})
+        results_dict.update({"index": temporal.hoy_to_date(host.analysis_period)})
 
     all_surface_irrad = np.sum([df['irrad'].values for df in surface_results], axis=0) / 1000  # wh to kwh
 
@@ -116,7 +116,7 @@ def write_building_results_timeseries(host, topology):
     if os.path.exists(electricity_loads):
         ignore_demand = False
         electricity_load = pd.read_csv(electricity_loads)[f"grid_demand_kwh"]
-        electricity_load_timeseries = electricity_load.values
+        electricity_load_timeseries = electricity_load.values[host.analysis_period]
         results_dict.update({"electricity_demand_building_kwh": electricity_load_timeseries})
     else:
         ignore_demand = True
@@ -167,7 +167,7 @@ def write_building_results_timeseries(host, topology):
             generation_surface_wh = []
             for module in modules:
                 module_dict = host.get_dict_instance([surface, module])
-                module_results = [pd.Series(module_dict['Yield'][topology][hoy]) for hoy in host.all_hoy]
+                module_results = [pd.Series(module_dict['Yield'][topology][hoy]) for hoy in host.analysis_period]
                 module_yield_df = pd.concat(module_results, axis=1).transpose()
                 generation_surface_wh.append(module_yield_df['pmp'])
             generation_surface_wh = pd.concat(generation_surface_wh, axis=1).sum(axis=1)
@@ -183,7 +183,7 @@ def write_building_results_timeseries(host, topology):
                 # string_modules = surface_dict['Strings'][string_key]['modules']
                 # for module in string_modules:
                 # module_dict = host.get_dict_instance([surface, module])
-                # module_results = [pd.Series(module_dict['Yield'][topology][hoy]) for hoy in host.all_hoy]
+                # module_results = [pd.Series(module_dict['Yield'][topology][hoy]) for hoy in host.analysis_period]
                 # module_yield_df = pd.concat(module_results, axis=1).transpose()
                 # generation_surface_wh.append(module_yield_df['pmp'])
             generation_surface_wh = pd.concat(generation_surface_wh, axis=1).sum(axis=1)
@@ -275,7 +275,7 @@ def write_building_results_timeseries(host, topology):
             results_dict.update({f"self_consumption_{surface_clean}_{general_dir}_percent": np.zeros_like(generation_surface_kwh)})
 
         # index datetime
-        results_dict.update({"index": temporal.hoy_to_date(host.all_hoy)})
+        results_dict.update({"index": temporal.hoy_to_date(host.analysis_period)})
 
 
     surface_irrad = [results_dict[dict_key] for dict_key in results_dict.keys() if "irrad_bulk" in dict_key]
@@ -285,16 +285,19 @@ def write_building_results_timeseries(host, topology):
     results_dict.update({f"electricity_gen_bulk_building_kwh": np.sum(surface_gen, axis=0)})
 
     df = pd.DataFrame(results_dict).set_index("index").round(3)
+    sunup_array_sorted = np.sort(host.project.sunup_array)#[host.analysis_period]
+    sundown_array_sorted = np.sort(host.project.sundown_array)#[host.analysis_period]
 
-    sunup_array_sorted = np.sort(host.project.sunup_array)
-    sundown_array_sorted = np.sort(host.project.sundown_array)
+    # print(sunup_array_sorted)
+    # print("---")
+    # print(sunup_array_sorted[host.analysis_period])
+    # print(df)
+    # sunup_df = df.iloc[sunup_array_sorted].copy()
+    # sunup_df.replace(0, np.nan, inplace=True)
+    # sunup_df = sunup_df.interpolate().bfill().ffill()
+    # sundown_df = df.iloc[sundown_array_sorted].fillna(0).copy()
 
-    sunup_df = df.iloc[sunup_array_sorted].copy()
-    sunup_df.replace(0, np.nan, inplace=True)
-    sunup_df = sunup_df.interpolate().bfill().ffill()
-    sundown_df = df.iloc[sundown_array_sorted].fillna(0).copy()
-
-    final_df = pd.concat([sunup_df, sundown_df]).sort_index()
+    final_df = df.copy()#pd.concat([sunup_df, sundown_df]).sort_index()
     if ignore_demand == False:
         final_df["electricity_demand_building_kwh"] = electricity_load_timeseries
 
@@ -322,7 +325,7 @@ def write_cumulative_scenario_results(project_folder, scenario, topology, bldg_r
     electricity_load = \
     pd.read_csv(os.path.join(project_folder, 'shared', 'resources', "loads", "annual_building_demand_time_period.csv"))[
         f"grid_demand_kwh_{year}"]
-    electricity_load_timeseries = electricity_load.values
+    electricity_load_timeseries = electricity_load.values#[host.analysis_period]
 
     # set result file
     if cumulative_target_folder is None:

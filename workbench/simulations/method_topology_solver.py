@@ -11,7 +11,7 @@ def solve_central_inverter_iv(host_object, surface):
     # surface_v = {}
     # surface_g = {}
     #
-    # for hoy in panelizer_object.all_hoy:
+    # for hoy in panelizer_object.analysis_period:
     #     strings_i_hoy = [
     #         panelizer_object.get_dict_instance([surface, string])['CURVES']['Istr'][hoy] for string in strings]
     #     strings_v_hoy = [
@@ -33,7 +33,7 @@ def solve_central_inverter_iv(host_object, surface):
     surface_v = {}
     surface_g = {}
 
-    for hoy in host_object.all_hoy:
+    for hoy in host_object.analysis_period:
         strings_i_hoy = []
         strings_v_hoy = []
         strings_g_hoy = []
@@ -82,7 +82,7 @@ def solve_central_inverter_mpp(host_object, surface):
     surface_dict = host_object.get_dict_instance([surface])
 
     temp_results_dict = {}
-    for hoy in host_object.all_hoy:
+    for hoy in host_object.analysis_period:
         Isrf_hoy = surface_dict['Curves']['Isrf'][hoy]
         Vsrf_hoy = surface_dict['Curves']['Vsrf'][hoy]
         Gsrf_hoy = surface_dict['Yield']["central_inverter"]['irrad'][hoy]
@@ -124,7 +124,7 @@ def solve_string_inverter_iv(host_object, surface, string):
     string_v = {}
     string_g = {}
 
-    for hoy in host_object.all_hoy:
+    for hoy in host_object.analysis_period:
 
         # if panelizer_object.simulation_suite == False:
         #     modules_i_hoy = [modules_i[n][hoy] for n, m in enumerate(panelizer_object.get_modules(surface, string))]
@@ -166,7 +166,7 @@ def solve_string_inverter_mpp(host_object, surface, string):
 
 
     temp_results_dict = {}
-    for hoy in host_object.all_hoy:
+    for hoy in host_object.analysis_period:
         Istr_hoy = string_dict['Curves']['Istr'][hoy]
         Vstr_hoy = string_dict['Curves']['Vstr'][hoy]
 
@@ -202,7 +202,7 @@ def solve_string_inverter_mpp(host_object, surface, string):
 
 def solve_micro_inverter_mpp(host_object, module_dict):
     temp_results_dict = {}
-    for hoy in host_object.all_hoy:
+    for hoy in host_object.analysis_period:
         Imod_hoy = module_dict['Curves']['Imod'][hoy]
         Vmod_hoy = module_dict['Curves']['Vmod'][hoy]
 

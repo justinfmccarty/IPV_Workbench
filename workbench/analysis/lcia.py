@@ -43,7 +43,7 @@ def calculate_inverter_embodied(topology, array_capacity):
     if topology == 'central_inverter':
         inverter_gwp = array_capacity * 28.0 # kgCO2e per kWp
     elif topology == 'string_inverter':
-        inverter_gwp = array_capacity * 48
+        inverter_gwp = array_capacity * 48.0
     elif topology == 'micro_inverter':
         inverter_gwp = array_capacity * 96.8
     else:

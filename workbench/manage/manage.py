@@ -1,5 +1,8 @@
 import glob
 import os
+from copy import copy
+from distutils.dir_util import copy_tree
+
 import pandas as pd
 import pathlib
 import shutil
@@ -45,6 +48,9 @@ def initiate_project(parent_directory, project_name, project_epw):
 
 class Project:
     def __init__(self, config_file_path):
+        self.setup_config(config_file_path)
+
+    def setup_config(self, config_file_path):
         self.config_file_path = config_file_path
         self.config = configparser.ConfigParser()
         self.config.read(config_file_path)
@@ -228,6 +234,18 @@ class Project:
               "The geometry files should follow the convention defined in the output of the template grasshopper and rhino files.\n"
               "The panelizer files are those that have been created using the grasshopper utility. The Panelizer is\n"
               "not ready for a pure python implementation as of yet.")
+
+
+    def add_loads_data(self, loads_path=None, default=False):
+        if default==True:
+            loads_path = os.path.join(pathlib.Path(pathlib.Path(__file__).parent).parent, 'template_files','stationary.csv')
+
+        shutil.copyfile(loads_path, self.HOST_STATIONARY_LOADS)
+
+
+
+
+
     def get_irradiance_results(self):
 
         active_surface = f"{self.analysis_active_surface}"
@@ -301,3 +319,28 @@ class Project:
                                         "sun-up-hours.txt")
             os.makedirs(os.path.dirname(self.SUN_UP_FILE), exist_ok=False)
             shutil.copy2(src_sun_file, self.SUN_UP_FILE)
+
+    def new_config_scenario(self, parent_directory, src_project_name, new_scenario_name, copy_radiance_output=True):
+        src_scenario_name = copy(self.management_scenario_name)
+        project_directory = os.path.join(parent_directory, src_project_name)
+        config_path = os.path.join(project_directory, f"{src_project_name}.config")
+        # new_config = os.path.join(project_directory, f"{dst_project_name}.config")
+        # io.copy_file(old_config, new_config)
+
+        src_scenario_input = os.path.join(project_directory, "inputs", "hosts", self.management_host_name,
+                                          src_scenario_name)
+        dst_scenario_input = os.path.join(project_directory, "inputs", "hosts", self.management_host_name,
+                                          new_scenario_name)
+        shutil.copytree(src_scenario_input, dst_scenario_input)
+
+        if copy_radiance_output==True:
+            src_radiance_output = copy(self.IRRADIANCE_RESULTS_DIR)
+        self.setup_config(config_path)
+        self.edit_cfg_file('management', 'scenario_name', new_scenario_name)
+        self.project_setup()
+
+        if copy_radiance_output == True:
+            shutil.copytree(src_radiance_output, self.IRRADIANCE_RESULTS_DIR, dirs_exist_ok=True)
+
+
+

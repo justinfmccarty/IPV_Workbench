@@ -23,7 +23,10 @@ class Host:
         self.topology = None
         self.tmy_dataframe = io.read_epw(self.project.TMY_FILE)
         self.tmy_location = general.tmy_location(self.project.TMY_FILE)
-        self.analysis_period = (None, None, None)  # start, end, increment
+        self.analysis_period = np.arange(int(self.project.analysis_analysis_period.split("-")[0]),
+                                         int(self.project.analysis_analysis_period.split("-")[1]),
+                                         self.project.analysis_temporal_resolution, dtype=int)
+
         self.all_hoy = temporal.datetime_index_to_hoy_array(self.tmy_dataframe.index)
         self.annual_hoy = np.arange(0, 8760, project.analysis_temporal_resolution)
         self.ncpu = mp.cpu_count() - 1
@@ -227,14 +230,14 @@ class Host:
 
     def solve_module_center_pts(self, surface):
         start_time = time.time()
-        dbt = self.tmy_dataframe['drybulb_C'].values[self.all_hoy]
-        psl = self.tmy_dataframe['atmos_Pa'].values[self.all_hoy]
+        dbt = self.tmy_dataframe['drybulb_C'].values[self.analysis_period]
+        psl = self.tmy_dataframe['atmos_Pa'].values[self.analysis_period]
 
         radiance_surface_key = self.get_dict_instance([surface])['Details']['radiance_surface_label']
         direct_irrad = io.load_irradiance_file(self.project, radiance_surface_key, "direct").values[
-            self.all_hoy]
+            self.analysis_period]
         diffuse_irrad = io.load_irradiance_file(self.project, radiance_surface_key, "diffuse").values[
-            self.all_hoy]
+            self.analysis_period]
         grid_pts = io.load_grid_file(self.project, radiance_surface_key)
         sensor_pts_xyz_arr = grid_pts[['X', 'Y', 'Z']].values
 
@@ -256,7 +259,7 @@ class Host:
                                                                                                 sensor_pts_xyz_arr,
                                                                                                 direct_irrad,
                                                                                                 diffuse_irrad,
-                                                                                                self.all_hoy,
+                                                                                                self.analysis_period,
                                                                                                 self.tmy_location,
                                                                                                 psl,
                                                                                                 dbt)
@@ -266,22 +269,22 @@ class Host:
                                                         "irrad": {},
                                                         'area': {}}
 
-            module_dict['Yield']['center_point']['pmp'] = dict(zip(self.all_hoy, power_result))
-            module_dict['Yield']['center_point']['irrad'] = dict(zip(self.all_hoy, irradiance_result))
-            module_dict['Yield']['center_point']['area'] = dict(zip(self.all_hoy, module_area))
+            module_dict['Yield']['center_point']['pmp'] = dict(zip(self.analysis_period, power_result))
+            module_dict['Yield']['center_point']['irrad'] = dict(zip(self.analysis_period, irradiance_result))
+            module_dict['Yield']['center_point']['area'] = dict(zip(self.analysis_period, module_area))
         total_time = round(time.time() - start_time, 2)
         self.project.log(total_time, "module-center-point")
 
     def solve_module_cell_pts(self, surface):
         start_time = time.time()
-        dbt = self.tmy_dataframe['drybulb_C'].values[self.all_hoy]
-        psl = self.tmy_dataframe['atmos_Pa'].values[self.all_hoy]
+        dbt = self.tmy_dataframe['drybulb_C'].values[self.analysis_period]
+        psl = self.tmy_dataframe['atmos_Pa'].values[self.analysis_period]
 
         radiance_surface_key = self.get_dict_instance([surface])['Details']['radiance_surface_label']
         direct_irrad = io.load_irradiance_file(self.project, radiance_surface_key, "direct").values[
-            self.all_hoy]
+            self.analysis_period]
         diffuse_irrad = io.load_irradiance_file(self.project, radiance_surface_key, "diffuse").values[
-            self.all_hoy]
+            self.analysis_period]
         grid_pts = io.load_grid_file(self.project, radiance_surface_key)
         sensor_pts_xyz_arr = grid_pts[['X', 'Y', 'Z']].values
 
@@ -302,7 +305,7 @@ class Host:
                                                                                               sensor_pts_xyz_arr,
                                                                                               direct_irrad,
                                                                                               diffuse_irrad,
-                                                                                              self.all_hoy,
+                                                                                              self.analysis_period,
                                                                                               self.tmy_location,
                                                                                               psl,
                                                                                               dbt)
@@ -344,21 +347,21 @@ class Host:
     def solve_all_modules_iv_curve(self, surface):
 
         start_time = time.time()
-        dbt = self.tmy_dataframe['drybulb_C'].values[self.all_hoy]
-        psl = self.tmy_dataframe['atmos_Pa'].values[self.all_hoy]
+        dbt = self.tmy_dataframe['drybulb_C'].values[self.analysis_period]
+        psl = self.tmy_dataframe['atmos_Pa'].values[self.analysis_period]
 
         radiance_surface_key = self.get_dict_instance([surface])['Details']['radiance_surface_label']
         direct_irrad = io.load_irradiance_file(self.project, radiance_surface_key, "direct").values[
-            self.all_hoy]
+            self.analysis_period]
         diffuse_irrad = io.load_irradiance_file(self.project, radiance_surface_key, "diffuse").values[
-            self.all_hoy]
+            self.analysis_period]
         grid_pts = io.load_grid_file(self.project, radiance_surface_key)
         sensor_pts_xyz_arr = grid_pts[['X', 'Y', 'Z']].values
 
         modules = self.get_modules(surface)
         for module_name in modules:
             module_dict = self.get_dict_instance([surface, module_name])
-            if (len(module_dict['Curves']['Imod'])==len(self.all_hoy)) & (len(module_dict['Curves']['Vmod'])==len(self.all_hoy)):
+            if (len(module_dict['Curves']['Imod'])==len(self.analysis_period)) & (len(module_dict['Curves']['Vmod'])==len(self.analysis_period)):
                 print(f"Module {module_name} was already solved. Skipping")
             else:
                 print(f"Solving module {module_name}.")
@@ -372,19 +375,19 @@ class Host:
                                                                                                       module_dict[
                                                                                                           'Details'][
                                                                                                           'panelizer_normal'],
-                                                                                                      self.all_hoy,
+                                                                                                      self.analysis_period,
                                                                                                       self.tmy_location,
                                                                                                       psl,
                                                                                                       dbt,
                                                                                                       module_dict['Layers'][
                                                                                                           'panelizer_front_film'])
 
-                Imod, Vmod = method_module_iv.solve_module_iv_curve(self, G_eff_ann_mod, module_dict, self.all_hoy, dbt)
+                Imod, Vmod = method_module_iv.solve_module_iv_curve(self, G_eff_ann_mod, module_dict, self.analysis_period, dbt)
                 module_dict['Curves']['Imod'] = Imod
                 module_dict['Curves']['Vmod'] = Vmod
 
                 Gmod = np.sum(G_eff_ann_mod * module_dict['Parameters']['param_one_cell_area_m2'], axis=1)
-                module_dict['Yield']['initial_simulation']['irrad'] = dict(zip(self.all_hoy, np.round(Gmod, 3)))
+                module_dict['Yield']['initial_simulation']['irrad'] = dict(zip(self.analysis_period, np.round(Gmod, 3)))
 
         total_time = round(time.time() - start_time, 2)
         self.project.log(total_time, "module-iv-curves")
@@ -563,7 +566,7 @@ class Host:
             mpp_results_dict = topology_solver.solve_micro_inverter_mpp(self, module_dict)
 
             # write these results to the module dict
-            for hoy in self.all_hoy:
+            for hoy in self.analysis_period:
                 module_dict[
                     'Yield'][self.topology]['imp'].update({hoy: mpp_results_dict[hoy]['imp']})
                 module_dict[
@@ -597,7 +600,7 @@ class Host:
 
             mpp_results_dict = topology_solver.solve_string_inverter_mpp(self, string_dict)
 
-            for hoy in self.all_hoy:
+            for hoy in self.analysis_period:
                 string_dict[
                     'YIELD'][self.topology]['imp'].update({hoy: mpp_results_dict[hoy]['imp']})
                 string_dict[
@@ -659,7 +662,7 @@ class Host:
 
         mpp_results_dict = topology_solver.solve_central_inverter_mpp(self, surface_dict)
 
-        for hoy in self.all_hoy:
+        for hoy in self.analysis_period:
             surface_dict[
                 'YIELD'][self.topology]['imp'].update({hoy: mpp_results_dict[hoy]['imp']})
             surface_dict[
@@ -755,7 +758,7 @@ class Host:
             string_dict[key].update(key_result)
 
         # recalculate efficiency
-        for hoy_n, hoy in enumerate(self.all_hoy):
+        for hoy_n, hoy in enumerate(self.analysis_period):
             string_power = string_dict['pmp'][hoy]
             string_irrad = string_dict['irrad'][hoy]
             if string_irrad == 0:
@@ -782,7 +785,7 @@ class Host:
                 surface_dict[key].update(key_result)
 
             # recalculate efficiency
-            for hoy_n, hoy in enumerate(self.all_hoy):
+            for hoy_n, hoy in enumerate(self.analysis_period):
                 surface_power = surface_dict['pmp'][hoy]
                 surface_irrad = surface_dict['irrad'][hoy]
                 if surface_irrad == 0:
@@ -802,7 +805,7 @@ class Host:
             object_dict[key].update(key_result)
 
         # recalculate efficieny
-        for hoy_n, hoy in enumerate(self.all_hoy):
+        for hoy_n, hoy in enumerate(self.analysis_period):
             object_power = object_dict['pmp'][hoy]
             object_irrad = object_dict['irrad'][hoy]
             if object_irrad == 0:
@@ -831,7 +834,7 @@ class Host:
         for key in result_dict.keys():
 
             result_series = pd.Series(result_dict[key], dtype='float').rename(key)
-            hoy_index = pd.Series(self.all_hoy) #pd.Series(np.arange(0, 8760, 1), name='HOY')
+            hoy_index = pd.Series(self.analysis_period) #pd.Series(np.arange(0, 8760, 1), name='HOY')
 
             result_df = pd.concat([hoy_index, result_series], axis=1)
             result = result_df[key]
@@ -870,7 +873,7 @@ class Host:
 
 
 def solve_object_module_iv(panelizer_object, write_system=False, mp=False, display_print=False):
-    timeseries = panelizer_object.all_hoy
+    timeseries = panelizer_object.analysis_period
     tmy_location = general.tmy_location(panelizer_object.tmy_file)
     dbt = panelizer_object.tmy_dataframe['drybulb_C'].values[timeseries]
     psl = panelizer_object.tmy_dataframe['atmos_Pa'].values[timeseries]

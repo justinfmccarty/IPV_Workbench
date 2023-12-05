@@ -54,7 +54,7 @@ def pv_watts_method(G_eff, T_cell, P_ref, gamma, T_ref=25, G_ref=1000, I_misc=0.
     return P_mp * (1 - I_misc)
 
 
-def module_center_pt(module_dict, sensor_pts_xyz_arr, direct, diffuse, all_hoy, tmy_location, psl, dbt):
+def module_center_pt(module_dict, sensor_pts_xyz_arr, direct, diffuse, analysis_period, tmy_location, psl, dbt):
     module_center = np.stack([module_dict['Details']['panelizer_center_pt']])
 
     T_noct = module_dict['Parameters']['performance_NOCT_T_degC']
@@ -72,7 +72,7 @@ def module_center_pt(module_dict, sensor_pts_xyz_arr, direct, diffuse, all_hoy, 
     G_eff_ann = method_effective_irradiance.calculate_effective_irradiance_timeseries(G_dir_ann,
                                                                                       G_diff_ann,
                                                                                       module_normal,
-                                                                                      all_hoy,
+                                                                                      analysis_period,
                                                                                       tmy_location,
                                                                                       psl,
                                                                                       dbt,
@@ -86,7 +86,7 @@ def module_center_pt(module_dict, sensor_pts_xyz_arr, direct, diffuse, all_hoy, 
 
     return module_area, irradiance, power
 
-def module_cell_pt(module_dict, pv_cells_xyz_arr, sensor_pts_xyz_arr, direct, diffuse, all_hoy, tmy_location, psl, dbt):
+def module_cell_pt(module_dict, pv_cells_xyz_arr, sensor_pts_xyz_arr, direct, diffuse, analysis_period, tmy_location, psl, dbt):
     T_noct = module_dict['Parameters']['performance_NOCT_T_degC']
     # nom_eff = module_dict['Parameters']['nom_eff']
     peak_power = module_dict['Parameters']['param_cell_peak_Wp']
@@ -104,7 +104,7 @@ def module_cell_pt(module_dict, pv_cells_xyz_arr, sensor_pts_xyz_arr, direct, di
     G_eff_ann = method_effective_irradiance.calculate_effective_irradiance_timeseries(G_dir_ann,
                                                                                       G_diff_ann,
                                                                                       module_normal,
-                                                                                      all_hoy,
+                                                                                      analysis_period,
                                                                                       tmy_location,
                                                                                       psl,
                                                                                       dbt,
@@ -113,7 +113,7 @@ def module_cell_pt(module_dict, pv_cells_xyz_arr, sensor_pts_xyz_arr, direct, di
     Pmod_results = {}
     Gmod_results = {}
     area_results = {}
-    for hoy_n, hoy in enumerate(all_hoy):
+    for hoy_n, hoy in enumerate(analysis_period):
         Gmod = G_eff_ann[hoy_n].flatten()
         Tcells = temperature.calculate_cell_temperature(Gmod, dbt[hoy_n], T_noct)
 

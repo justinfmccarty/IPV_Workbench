@@ -27,7 +27,7 @@ def solve_module_iv_curve(host_object, G_eff_ann_mod, module_dict, temporal_idx,
 
 def solve_module_map_dependent(Gmod, Tmod, module_dict, device_iv_dict, irradiance_range, temperature_range):
     if module_dict['Parameters']['param_n_subcells'] > 1:
-        if module_dict['Parameters']['shape_orientation'] == 'portrait':
+        if module_dict['Parameters']['module_shape_N_rows_typical'] == 1:
             pass
             # Imod, Vmod = calculate_module_curve_single_row(Gmod,
             #                                                Tmod,
@@ -37,14 +37,13 @@ def solve_module_map_dependent(Gmod, Tmod, module_dict, device_iv_dict, irradian
             #                                                module_dict['MAPS']['SUBCELLS'],
             #                                                ivcurve_pnts=ivcurve_pnts)
         else:
-            pass
-            # Imod, Vmod = calculate_module_curve_single_column(Gmod,
-            #                                                   Tmod,
-            #                                                   module_dict['PARAMETERS'],
-            #                                                   module_dict['MAPS']['SUBMODULES'],
-            #                                                   module_dict['MAPS']['DIODES'],
-            #                                                   module_dict['MAPS']['SUBCELLS'],
-            #                                                   ivcurve_pnts=ivcurve_pnts)
+            Imod, Vmod = calculate_module_curve_single_column(Gmod,
+                                                              Tmod,
+                                                              module_dict['PARAMETERS'],
+                                                              module_dict['MAPS']['SUBMODULES'],
+                                                              module_dict['MAPS']['DIODES'],
+                                                              module_dict['MAPS']['SUBCELLS'],
+                                                              ivcurve_pnts=ivcurve_pnts)
 
     else:
         Imod, Vmod = module_curve_multiple_column(Gmod,
