@@ -204,8 +204,8 @@ def read_epw(path_data, create_timeseries=True):
                      skiprows=8,
                      header=None,
                      index_col=False,
-                     usecols=list(range(0, 35)),
-                     names=tmy_labels)  # .drop('datasource', axis=1)
+                     # usecols=list(range(0, 35)),
+                     names=tmy_labels).drop('datasource', axis=1)
 
     if calendar.isleap(df['year'].tolist()[0]):
         df['year'] += 1
