@@ -142,7 +142,7 @@ def module_cell_pt(module_dict, pv_cells_xyz_arr, sensor_pts_xyz_arr, direct, di
         # then take the sum of irradiance for all the cells
         # this statement takes the mean of the subcells if necesssary (just like in the simulation)
         if module_dict['Parameters']['param_n_subcells'] > 1:
-            if module_dict['Parameters']['orientation'] == 'portrait':
+            if module_dict['Parameters']['shape_orientation'] == 'portrait':
                 Gmod = np.mean(Gmod, axis=0)
             else:
                 Gmod = np.mean(Gmod, axis=1)
