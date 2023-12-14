@@ -4,7 +4,7 @@ import os
 import re
 import pathlib
 import time
-
+import sys
 import numpy as np
 import pandas as pd
 import pyarrow.feather as feather
@@ -135,7 +135,7 @@ def create_skyglow(skyglow_file, resolution, dst):
 def build_cmd_rfluxmtx(radiance_project_dir, radiance_surface_key, skyglow_template, step, use_accelerad=False,
                        n_workers=None, rad_params=None):
     if use_accelerad==True:
-        print("Using Accelerad.")
+        print("         - Using Accelerad.")
         cmd = ["accelerad_rfluxmtx", "-I+"]
     else:
         cmd = ["rfluxmtx", "-I+"]
@@ -331,13 +331,21 @@ def build_cmd_cnt():
 def build_cmd_rcalc(cal='reinsrc.cal'):
     cmd = ['rcalc']
 
-    cmd += ['-e', 'MF:6', '-f', cal, '-e', 'Rbin=recno', '-o', r"'solar source sun 0 0 4 ${Dx} ${Dy} ${Dz} 0.533'"]
-
+    
+    if "win" in sys.platform:
+        cmd += ['-e', 'MF:6', '-f', cal, '-e', 'Rbin=recno', '-o', r""" "solar source sun 0 0 4 ${Dx} ${Dy} ${Dz} 0.533" """]
+    else:
+        cmd += ['-e', 'MF:6', '-f', cal, '-e', 'Rbin=recno', '-o', r"'solar source sun 0 0 4 ${Dx} ${Dy} ${Dz} 0.533'"]
+        
     return cmd
 
 
-def build_cmd_rcontrib(radiance_project_dir, radiance_surface_key, cal="reinhart.cal", n_workers=None, rad_params=None):
-    cmd = ["rcontrib", "-I+", "-ab", "1"]
+def build_cmd_rcontrib(radiance_project_dir, radiance_surface_key, use_accelerad=False, cal="reinhart.cal", n_workers=None, rad_params=None):
+    if use_accelerad==True:
+        print("         - Using Accelerad.")
+        cmd = ["accelerad_rcontrib", "-I+", "-ab", "1"]
+    else:
+        cmd = ["rcontrib", "-I+", "-ab", "1"]
     radiance_surface_dir = os.path.join(radiance_project_dir, radiance_surface_key)
     output_dir = os.path.join(radiance_surface_dir, "outputs", "matrices")
     io.directory_creator(output_dir)
@@ -386,7 +394,7 @@ def run_2phase_dds(project, year=2099):
     start_time = time.time()
     ## epw2wea with filtering
     # build command
-    print(" - Initializing the opening weather file.")
+    print(" - Initializing the weather file.")
     if pathlib.Path(scenario_tmy).suffix == ".epw":
         cmd_epw2wea, output_wea = build_cmd_epw2wea(radiance_project_dir, radiance_surface_key, scenario_tmy)
         # run command
@@ -403,7 +411,9 @@ def run_2phase_dds(project, year=2099):
         print("     - oconv")
         cmd_oconv, output = build_cmd_oconv(radiance_project_dir, radiance_surface_key, step)
         with open(output, 'w') as fp:
+            
             proc = subprocess.run(cmd_oconv, check=True, input=None, stdout=fp)
+            
 
         ## rfluxmtx
         print("     - rfluxmtx")
@@ -466,7 +476,7 @@ def run_2phase_dds(project, year=2099):
     ## Run rcontrib
     print("     - rcontrib")
     cmd_rcontrib, output_file, input_file = build_cmd_rcontrib(radiance_project_dir, radiance_surface_key,
-                                                               n_workers=n_workers,
+                                                               use_accelerad=project.irradiance_use_accelerad, n_workers=n_workers,
                                                                rad_params=rcontrib_rad_params)
     with open(input_file, "rb") as fp:
         proc = subprocess.run(cmd_rcontrib, check=True, stdin=fp,

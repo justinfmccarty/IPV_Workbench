@@ -103,7 +103,8 @@ def building_string_map(building, surface):
     surface_dict = building.get_dict_instance([surface])
 
     capacities = building.get_surface_capacities(surface)
-    string_keys = list(constants.alphabet[0:len(capacities)].strip())
+    string_keys = ["s" + str(n).zfill(3) for n in range(0, len(capacities))]
+    # string_keys = list(constants.alphabet[0:len(capacities)].strip())
 
     string_map = {}
 
@@ -137,7 +138,8 @@ def building_string_map(building, surface):
 
     new_string_set = general.flatten_list(new_string_set)
     new_module_capacity_set = general.flatten_list(new_module_capacity_set)
-    new_string_keys = list(constants.alphabet[0: len(new_string_set)].strip())
+    # new_string_keys = list(constants.alphabet[0: len(new_string_set)].strip())
+    new_string_keys = ["s" + str(n).zfill(3) for n in range(0, len(new_string_set))]
 
     new_string_map = {}
     for new_string_key, new_string_module_list, new_capacity in zip(
