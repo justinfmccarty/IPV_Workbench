@@ -31,7 +31,7 @@ def calculate_module_gwp(cell_type, area):
 
     return module_gwp
 
-def module_projected_output(production_values, lifetime, max_performance=97, annual_factor=0.54, min_performance=80):
+def module_projected_output(production_values, lifetime, max_performance=100, annual_factor=0.54, min_performance=80):
     derate_factors = np.linspace(max_performance,
                                  max_performance - (lifetime * annual_factor),
                                  num=lifetime).reshape(-1, 1)
