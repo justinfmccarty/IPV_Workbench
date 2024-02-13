@@ -140,11 +140,11 @@ class Project:
         ### device data
         self.MODULE_CELL_DIR = os.path.join(self.SHARED_DIR, "cell_module_data")
         io.directory_creator(self.MODULE_CELL_DIR)
-        self.module_cell_data = os.path.join(self.MODULE_CELL_DIR, "cactus_typical_devices.csv")
+        self.module_cell_data = os.path.join(self.MODULE_CELL_DIR, "cactus_devices.csv")
         if os.path.exists(self.module_cell_data):
             pass
         else:
-            default_module_data = os.path.join(library_root, "device", "default_devices", "cactus_typical_devices.csv")
+            default_module_data = os.path.join(library_root, "device", "default_devices", "cactus_devices.csv")
             io.copy_file(default_module_data, self.module_cell_data)
         self.cec_data = os.path.join(self.MODULE_CELL_DIR, "cec_database_local.csv")
         if os.path.exists(self.cec_data):
