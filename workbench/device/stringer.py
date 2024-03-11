@@ -38,7 +38,6 @@ def split_large_string_group(building, surface, initial_string_group, inverter_c
             string_dicts[key] = [module]
 
     string_dicts = dict(sorted(string_dicts.items()))
-
     return create_lists_from_dict(string_dicts, n_strings, n_per)
 
 
@@ -75,6 +74,7 @@ def vector_control_stringer(building, surface_dict, initial_string_group, invert
 def split_up_initial_strings(building, surface_dict, string_key):
     initial_string_group = surface_dict['Strings'][string_key]
     total_capacity = initial_string_group['total_capacity_kWp']
+    print(total_capacity)
     if total_capacity < 0.5:  # kW
         # one string using a 0.5kW inverter
         new_string_groups = [initial_string_group['modules']]
@@ -134,13 +134,12 @@ def building_string_map(building, surface):
         new_string_list = split_up_initial_strings(building, surface_dict, string_key)
         new_string_set.append(new_string_list)
         module_capacity = surface_dict['Strings'][string_key]['module_capacity_Wp']
-        new_module_capacity_set.append([module_capacity] * len(new_string_set))
+        new_module_capacity_set.append([module_capacity] * len(new_string_list))
 
     new_string_set = general.flatten_list(new_string_set)
     new_module_capacity_set = general.flatten_list(new_module_capacity_set)
     # new_string_keys = list(constants.alphabet[0: len(new_string_set)].strip())
     new_string_keys = ["s" + str(n).zfill(3) for n in range(0, len(new_string_set))]
-
     new_string_map = {}
     for new_string_key, new_string_module_list, new_capacity in zip(
             new_string_keys, new_string_set, new_module_capacity_set
@@ -167,3 +166,4 @@ def building_string_map(building, surface):
         new_string_map[new_string_key]["module_capacity_Wp"] = new_capacity
 
     surface_dict['Strings'] = new_string_map
+    return new_string_map

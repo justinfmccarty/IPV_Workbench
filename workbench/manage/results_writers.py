@@ -126,36 +126,6 @@ def write_building_results_timeseries(host, topology):
                                         f"{scenario}_{topology}_building_level_results_hourly.csv")
     io.directory_creator(Path(building_target_file).parent)
 
-
-
-
-
-    # # overall_results
-    # object_dict = host.get_dict_instance([])
-    # object_capacity_w = object_dict['Details']['installed_capacity_Wp']
-    # object_capacity_kw = object_capacity_w / 1000
-    # object_area = object_dict['Details']['installed_area_m2']
-    #
-    # results_dict.update(
-    #     {f"index": po.get_tabular_results([], topology=topology, analysis_period=None, rename_cols=False)[
-    #         ['pmp']].index})
-    #
-    # generation_total_wh = po.get_tabular_results([], topology=topology, analysis_period=None, rename_cols=False)[
-    #     ['pmp']].values.flatten()
-    # generation_total_kwh = generation_total_wh / 1000
-    # results_dict.update({f"electricity_gen_bulk_building_kwh": generation_total_kwh})
-    #
-    # # add electricity demand (although it is overwritten at the end
-    # results_dict.update({"electricity_demand_building_kwh": electricity_load_timeseries})
-    #
-    # object_specific_yield = generation_total_kwh / object_capacity_kw
-    # results_dict.update({f"electricity_specific_yield_building_kwh_kwp": object_specific_yield})
-    #
-    # object_generation_intensity = generation_total_kwh / object_area
-    # results_dict.update({f"electricity_gen_intensity_building_kwh": object_generation_intensity})
-
-    # surface_level_results
-
     for surface in host.get_surfaces():
         surface_dict = host.get_dict_instance([surface])
         surface_clean = general.clean_grasshopper_key(surface)
@@ -169,6 +139,7 @@ def write_building_results_timeseries(host, topology):
                 module_dict = host.get_dict_instance([surface, module])
                 module_results = [pd.Series(module_dict['Yield'][topology][hoy]) for hoy in host.analysis_period]
                 module_yield_df = pd.concat(module_results, axis=1).transpose()
+                module_yield_df = module_yield_df.set_index(host.analysis_period)
                 generation_surface_wh.append(module_yield_df['pmp'])
             generation_surface_wh = pd.concat(generation_surface_wh, axis=1).sum(axis=1)
         elif topology=='string_inverter':
@@ -283,7 +254,10 @@ def write_building_results_timeseries(host, topology):
     results_dict.update({f"irrad_whole_building_kwh": np.sum(surface_irrad, axis=0)})
     surface_gen = [results_dict[dict_key] for dict_key in results_dict.keys() if "electricity_gen_bulk" in dict_key]
     results_dict.update({f"electricity_gen_bulk_building_kwh": np.sum(surface_gen, axis=0)})
-
+    # print(list(results_dict.keys())[1])
+    # print(results_dict['index'])
+    # print("     ")
+    # print(list(results_dict.values())[1])
     df = pd.DataFrame(results_dict).set_index("index").round(3)
     sunup_array_sorted = np.sort(host.project.sunup_array)#[host.analysis_period]
     sundown_array_sorted = np.sort(host.project.sundown_array)#[host.analysis_period]
