@@ -127,6 +127,7 @@ def assemble_parallel(I, V, Vmax, Vmin, Voc=None):
 # ================================ Utilities ================================
 
 def calc_short_circuit(iv_curves):
+
     # substring_Isc = [np.interp(0,
     #                         sub[:,1], # V curve valeus
     #                         sub[:,0]) # I curve values

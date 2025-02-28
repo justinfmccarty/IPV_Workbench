@@ -47,7 +47,7 @@ def create_datetime(start="01-01-2023-00:00", end="12-31-2023-23:00", freq='H', 
 
 
 def hoy_to_date(hoy, year=2023):
-    return pd.Timestamp(f'{year}-01-01') + pd.to_timedelta(hoy, unit='H')
+    return pd.Timestamp(f'{year}-01-01') + pd.to_timedelta(hoy, unit='h')
 
 
 def datetime_index_to_hoy_array(datetime_idx):

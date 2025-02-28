@@ -36,8 +36,8 @@ def calc_self_sufficiency_consumption_single_value(demand, generation):
     pv_consumed = demand - net_demand_clipped
 
     # self_sufficiency = np.sum(pv_consumed) / np.sum(demand) * 100
-    self_sufficiency = general.divide_zero_array(np.sum(pv_consumed), np.sum(demand) * 100)
+    self_sufficiency = general.divide_zero_array(np.sum(pv_consumed), np.sum(demand)) * 100
     # self_consumption = np.sum(pv_consumed) / np.sum(generation) * 100
-    self_consumption = general.divide_zero_array(np.sum(pv_consumed), np.sum(generation) * 100)
+    self_consumption = general.divide_zero_array(np.sum(pv_consumed), np.sum(generation)) * 100
 
     return self_sufficiency, self_consumption

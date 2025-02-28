@@ -4,6 +4,12 @@ from workbench.utilities import circuits, general
 from workbench.simulations import method_iv_solver, method_effective_irradiance
 from workbench.device import temperature
 
+def solve_module_iv_curve_single_step(host_object, Gmod, Tmod, module_dict):
+    Imod_hoy, Vmod_hoy = solve_module_map_dependent(Gmod, Tmod, module_dict, host_object.device_iv_dict,
+                                                    host_object.irradiance_range,
+                                                    host_object.temperature_range)
+
+    return Imod_hoy, Vmod_hoy
 
 def solve_module_iv_curve(host_object, G_eff_ann_mod, module_dict, temporal_idx,
                           dbt):
