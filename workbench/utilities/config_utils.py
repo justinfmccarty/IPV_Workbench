@@ -1,6 +1,6 @@
 import configparser
 import pathlib
-
+import ast
 def format_config_item(section, key, value):
 
     config_dtypes = {'management': {'project_name': 'str',
@@ -54,15 +54,20 @@ def format_config_item(section, key, value):
         elif format_type == 'bool':
             value_out = bool_map[str(value).lower()]
         elif format_type == 'list-str':
-            value_out = [str(v) for v in value.split(",")]
+            value = ast.literal_eval(value)
+            value_out = [str(v) for v in value]
         elif format_type == 'list-int':
-            value_out = [int(v) for v in value.split(",")]
+            value = ast.literal_eval(value)
+            value_out = [int(v) for v in value]
         elif format_type == 'list-float':
-            value_out = [float(v) for v in value.split(",")]
+            value = ast.literal_eval(value)
+            value_out = [float(v) for v in value]
         elif format_type == 'list-bool':
-            value_out = [bool_map[str(v).lower()] for v in value.split(",")]
+            value = ast.literal_eval(value)
+            value_out = [bool_map[str(v).lower()] for v in value]
         elif format_type == 'tuple-float':
-            value_out = tuple([float(v) for v in value.split(",")])
+            value = ast.literal_eval(value)
+            value_out = tuple([float(v) for v in value])
         else:
             value_out = str(value)
 

@@ -59,17 +59,18 @@ class Project:
                 value_in = self.config[section][k]
                 formatted_value = config_utils.format_config_item(section, k, value_in)
                 self.__setattr__(f"{section}_{k}", formatted_value)
+                self.edit_cfg_file(section, k, formatted_value, skip_update=True)
         if self.irradiance_use_accelerad == True:
             self.irradiance_n_workers = 1
         else:
             if self.irradiance_n_workers == 0:
                 self.irradiance_n_workers = os.cpu_count() - 1
 
-        for section in self.config.sections():
-            for k in list(self.config[section].keys()):
-                value_in = self.__getattribute__(f"{section}_{k}")
-                formatted_value = config_utils.format_config_item(section, k, value_in)
-                self.edit_cfg_file(section, k, formatted_value, skip_update=True)
+        # for section in self.config.sections():
+        #     for k in list(self.config[section].keys()):
+        #         value_in = self.__getattribute__(f"{section}_{k}")
+        #         formatted_value = config_utils.format_config_item(section, k, value_in)
+        #         self.edit_cfg_file(section, k, formatted_value, skip_update=True)
 
     def project_setup(self):
         library_root = pathlib.Path(__file__).parent.parent

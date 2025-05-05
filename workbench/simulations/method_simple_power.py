@@ -84,7 +84,10 @@ def module_center_pt(module_dict, sensor_pts_xyz_arr, direct, diffuse, analysis_
     # P = simple_power_models.module_efficiency_method(nom_eff, area_mod, G_eff_ann, gamma_ref, T_cell)
     power = np.vectorize(pv_watts_method)(G_eff_ann, T_cell, peak_power, gamma_ref)
     module_area = np.zeros_like(power) + area_cells
-    irradiance = G_eff_ann * area_mod
+    irradiance = G_eff_ann * module_area
+
+    # if area_cells==0.153:
+    #     print(direct[0:24])
 
     return module_area, irradiance, power
 

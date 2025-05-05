@@ -280,7 +280,6 @@ def build_full_ill(ill_df, wea_file=None):
     else:
         wea, header = io.read_wea(wea_file)
         ill_df.set_index(wea.index, inplace=True, drop=True)
-
     return ill_df
 
 
