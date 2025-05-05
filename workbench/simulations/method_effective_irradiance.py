@@ -233,24 +233,24 @@ def calculate_effective_irradiance_timeseries(G_dir, G_diff, evaluated_normal_ve
     return angular_loss
 
 
-def get_effective_module_irradiance(panelizer_object, surface, string, module_name, sensor_pts_xyz_arr,
+def get_effective_module_irradiance(panelizer_object, surface, module_name, sensor_pts_xyz_arr,
                                     direct_ill, diffuse_ill):
-    module_dict = panelizer_object.get_dict_instance([surface, string, module_name])
-    module_normal = tuple(module_dict['CELLSNORMALS'][0])
-    front_cover = module_dict['LAYERS']['front_film']
-    tmy_location = general.tmy_location(panelizer_object.tmy_file)
+    module_dict = panelizer_object.get_dict_instance([surface, module_name])
+    module_normal = tuple(module_dict['CellsNormals'][0])
+    front_cover = module_dict['Layers']['panelizer_front_film']
+    tmy_location = panelizer_object.tmy_location
     timeseries = panelizer_object.all_hoy
     dbt = panelizer_object.tmy_dataframe['drybulb_C'].values[timeseries]
     psl = panelizer_object.tmy_dataframe['atmos_Pa'].values[timeseries]
 
-    pv_cells_xyz_arr = panelizer_object.get_cells_xyz(surface, string, module_name)
+    pv_cells_xyz_arr = panelizer_object.get_cells_xyz(surface, module_name)
     if len(pv_cells_xyz_arr.shape) > 2:
         pv_cells_xyz_arr = pv_cells_xyz_arr[0]
 
-    G_dir_ann = collect_raw_irradiance(pv_cells_xyz_arr,
+    G_dir_ann = general.collect_raw_irradiance(pv_cells_xyz_arr,
                                        sensor_pts_xyz_arr,
                                        direct_ill)  # .values)
-    G_diff_ann = collect_raw_irradiance(pv_cells_xyz_arr,
+    G_diff_ann = general.collect_raw_irradiance(pv_cells_xyz_arr,
                                         sensor_pts_xyz_arr,
                                         diffuse_ill)  # .values)
 

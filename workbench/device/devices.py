@@ -129,7 +129,7 @@ class Cell:
         # TODO map datatypes to value assignment
         for k, v in self.parameters_dict.items():
             setattr(self, k, v)
-        self.cell_area = self.cell_width * self.cell_height
+        # self.cell_area = general_cell_area_mm2_typical
 
     def assign_iv_library(self, profile_path, write_library=True):
         conditions = general.create_conditions_map()
@@ -418,6 +418,7 @@ def find_device_map(device_paramaters, project_manager, map_type='submodule'):
     device_name = device_paramaters['general_device_summary']
     device_orientation = device_paramaters['shape_orientation']
     file_name = f"{device_name}_{device_orientation}_maps"
+    
     file_path = [fp for fp in project_manager.LOCAL_MAPS_FILES if file_name in fp][0]
     map_arr = pd.read_excel(file_path, header=None, sheet_name=map_type).to_numpy()  # .tolist()
     if len(map_arr)==0:

@@ -25,7 +25,19 @@ def calc_series(iv_curves, breakdown_voltage, diode_threshold=None, bypass=True)
 
 def assemble_series(I, V, meanIsc, Imax):
     """
-    This is maodified version of the calc series method used by Sunpower's pvmismatch tool
+    This is modified version of the calcSeries method used by Sunpower's pvmismatch tool
+    Original code from PVMismatch (https://github.com/SunPower/PVMismatch/blob/b391a98c5ded478a73b3c6a08e8de89024be5156/LICENSE)
+    Copyright (c) 2017, SunPower Corp.
+    All rights reserved.
+    Author(s): https://github.com/SunPower/PVMismatch
+    URL: https://github.com/SunPower/PVMismatch/blob/b391a98c5ded478a73b3c6a08e8de89024be5156/pvmismatch/pvmismatch_lib/pvconstants.py#L125
+    secondary URL: https://github.com/SunPower/PVMismatch/blob/b391a98c5ded478a73b3c6a08e8de89024be5156/pvmismatch/pvmismatch_lib/pvconstants.py#L100
+    License: BSD-3-Clause
+
+     Modifications:
+     - We have hardcoded assumptions about the number of points in the IV curve
+     - additional changes were made to remove the need for PVMismatch's internal classes by moving code from the npts method into this function
+
 
     Calculate IV curve for cells and substrings in series given current and
     voltage in increasing order by voltage, the average short circuit
@@ -38,6 +50,8 @@ def assemble_series(I, V, meanIsc, Imax):
     """
     I = np.asarray(I)  # currents [A]
     V = np.asarray(V)  # voltages [V]
+
+    # modifications start
     # make sure all inputs are numpy arrays, but don't make extra copies
     _npts = 101
     pts = (11. - np.logspace(np.log10(11.), 0., _npts)) / 10.
@@ -45,6 +59,7 @@ def assemble_series(I, V, meanIsc, Imax):
     pts = pts.reshape((_npts, 1))
     Imod_pts = 1 - np.flipud(pts)
     Imod_pts_sq = Imod_pts ** 2 + np.finfo(np.float64).eps
+    # modifications end
 
     meanIsc = np.asarray(meanIsc)  # mean Isc [A]
     Imax = np.asarray(Imax)  # max current [A]
@@ -53,11 +68,15 @@ def assemble_series(I, V, meanIsc, Imax):
     # range of currents in forward bias from 0 to mean Isc
     Iforward = meanIsc * pts
     Imin = np.minimum(I.min(), 0.)  # minimum cell current, at most zero
+
+    # modifications start
     # range of negative currents in the 4th quadrant from min current to 0
     negpts = (11. - np.logspace(np.log10(11. - 1. / float(_npts)),
                                 0., _npts)) / 10.
     negpts = negpts.reshape((_npts, 1))
     Imod_negpts = 1 + 1. / float(_npts) / 10. - negpts
+    # modifications end
+
     Iquad4 = Imin * Imod_negpts
     # create range for interpolation from forward to reverse bias
     Itot = np.concatenate((Iquad4, Iforward, Ireverse), axis=0).flatten()
@@ -80,6 +99,19 @@ def calc_parallel(iv_curves):
 
 def assemble_parallel(I, V, Vmax, Vmin, Voc=None):
     """
+    This is modified version of the calcParallel method used by Sunpower's pvmismatch tool
+    Original code from PVMismatch (https://github.com/SunPower/PVMismatch/blob/b391a98c5ded478a73b3c6a08e8de89024be5156/LICENSE)
+    Copyright (c) 2017, SunPower Corp.
+    All rights reserved.
+    Author(s): https://github.com/SunPower/PVMismatch
+    URL: https://github.com/SunPower/PVMismatch/blob/b391a98c5ded478a73b3c6a08e8de89024be5156/pvmismatch/pvmismatch_lib/pvconstants.py#L158
+    secondary URL: https://github.com/SunPower/PVMismatch/blob/b391a98c5ded478a73b3c6a08e8de89024be5156/pvmismatch/pvmismatch_lib/pvconstants.py#L100
+    License: BSD-3-Clause
+
+     Modifications:
+     - We have hardcoded assumptions about the number of points in the IV curve
+     - additional changes were made to remove the need for PVMismatch's internal classes by moving code from the npts method into this function
+
     Calculate IV curve for cells and substrings in parallel.
     :param I: currents [A]
     :type: I: list, :class:`numpy.ndarray`
@@ -89,7 +121,7 @@ def assemble_parallel(I, V, Vmax, Vmin, Voc=None):
     :param Vmin: min voltage limit, could be zero or Vrbd [V]
     :param Voc: (``None``) open circuit voltage [V]
     """
-
+    # modifications start
     _npts = 101
     pts = (11. - np.logspace(np.log10(11.), 0., _npts)) / 10.
     negpts = (11. - np.logspace(np.log10(11. - 1. / float(_npts)),
@@ -98,6 +130,7 @@ def assemble_parallel(I, V, Vmax, Vmin, Voc=None):
     pts = pts.reshape((_npts, 1))
     Imod_negpts = 1 + 1. / float(_npts) / 10. - negpts
     Vmod_q4pts = np.flipud(Imod_negpts)
+    # modifications end
 
     if Voc is None:
         Voc = Vmax

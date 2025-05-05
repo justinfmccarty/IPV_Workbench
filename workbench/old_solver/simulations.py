@@ -147,12 +147,29 @@ def solve_subcells(parameters, Geff, Tcell, ivcurve_pnts=250):
 #         return None
 
 def calcMPP_IscVocFF(Isys, Vsys):
-    """from PVmismatch"""
+    """
+    This is modified version of the calcMPP_IscVocFFeff method used by Sunpower's pvmismatch tool
+    Original code from PVMismatch (https://github.com/SunPower/PVMismatch/blob/b391a98c5ded478a73b3c6a08e8de89024be5156/LICENSE)
+    Copyright (c) 2017, SunPower Corp.
+    All rights reserved.
+    Author(s): https://github.com/SunPower/PVMismatch
+    URL: https://github.com/SunPower/PVMismatch/blob/b391a98c5ded478a73b3c6a08e8de89024be5156/pvmismatch/pvmismatch_lib/pvsystem.py#L99
+    License: BSD-3-Clause
+
+     Modifications:
+     - added an if statement to pass by situations in which there is no power
+     - altered the calculations wrapper for the derivaties to ensure the array shapes matched what are necessary within this package
+     - data is returned in a new form for conveinence
+
+     """
     Psys = Isys * Vsys
     mpp = np.argmax(Psys)
+
+    # modifications start
     if Psys[mpp] == 0:
         Imp, Vmp, Pmp, Isc, Voc, FF = 0, 0, 0, 0, 0, 0
     else:
+        # modifications end
         P = Psys[mpp - 1:mpp + 2]
         V = Vsys[mpp - 1:mpp + 2]
         I = Isys[mpp - 1:mpp + 2]

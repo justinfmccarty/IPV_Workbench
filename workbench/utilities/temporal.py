@@ -19,7 +19,7 @@ def ts_8760(year=2022, tz=None):
     return index
 
 
-def create_datetime(start="01-01-2023-00:00", end="12-31-2023-23:00", freq='H', override_leap=False):
+def create_datetime(start="01-01-2023-00:00", end="12-31-2023-23:00", freq='h', override_leap=False):
     if override_leap == False:
         if pd.Timestamp(start).is_leap_year:
             print("Input year is a leap year, but Override leap is set to False.\n"

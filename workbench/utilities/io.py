@@ -34,6 +34,16 @@ def load_irradiance_file(project, radiance_surface_key, component):
     ill_df.sort_index(inplace=True)
     return ill_df
 
+def load_irradiance_file_no_object(management_parent_dir, management_project_name, management_host_name, management_scenario_name, radiance_surface_key, component):
+    input_surface_dir = os.path.join(management_parent_dir, management_project_name, "inputs", "hosts", management_host_name,
+                                     management_scenario_name, "radiance", f"{radiance_surface_key}")
+    wea_filepath = os.path.join(input_surface_dir, "model", f"{management_scenario_name}.wea")
+    output_surface_dir = os.path.join(management_parent_dir, management_project_name, "outputs", management_host_name,
+                                      management_scenario_name, "irradiance", f"{radiance_surface_key}")
+    results_filepath = os.path.join(output_surface_dir, f"{component}.lz4")
+    ill_df = general.build_full_ill(results_filepath, wea_file=wea_filepath)
+    ill_df.sort_index(inplace=True)
+    return ill_df
 
 def read_wea(wea_file, year=2030):
     with open(wea_file, "r") as fp:
@@ -67,13 +77,15 @@ def read_ill(filepath):
     # return pd.read_csv(filepath, delimiter=' ', header=None, dtype='float32').iloc[:, 1:].T.reset_index(drop=True)
     if pathlib.Path(filepath).suffix == ".ill":
         skiprows_n = find_ill_skip(filepath)
-        df = pd.read_csv(filepath, header=None, skiprows=skiprows_n, delimiter=' ', dtype='float')
+        df = pd.read_csv(filepath, header=None, skiprows=skiprows_n, delimiter=' ', dtype='float') * 1000
         # df = df[range(1, len(df.columns))].round(2)
-        df = df.round(2)
+        df = df.round(5)
     else:
-        df = pd.read_feather(filepath)
+        df = pd.read_feather(filepath) * 1000
         # df = df[range(1, len(df.columns))].round(2)
-        df = df.round(2)
+        df = df.round(5)
+    # df[0] = 0
+    # print(df.iloc[10:14])
     return df
 
 
